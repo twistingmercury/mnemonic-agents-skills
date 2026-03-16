@@ -6,19 +6,8 @@ SCRIPTS="$(cd "$(dirname "$0")" && pwd)"
 SETUP_DIR="${SETUP_DIR:-$(cd "${SCRIPTS}/.." && pwd)}"
 PROJ_ROOT="${PROJ_ROOT:-$(cd "${SETUP_DIR}/.." && pwd)}"
 
-# Logging setup
-TIMESTAMP="${TIMESTAMP:-$(date +%Y%m%d-%H%M%S)}"
-LOG_DIR="${SCRIPTS}/logs/${TIMESTAMP}"
-LOG_FILE="${LOG_DIR}/03-install-skills.log"
-
-mkdir -p "${LOG_DIR}"
-exec > >(tee -a "${LOG_FILE}") 2>&1
-trap '{ exec 1>&- 2>&-; wait; }' EXIT
-
-printf "Logging to: %s\n" "${LOG_FILE}"
-
-SKILL_SOURCE="${PROJ_ROOT}/skills"
-SKILLS_DIR="${HOME}/.claude/skills/"
+SKILL_SOURCE="${SKILL_SOURCE:-${PROJ_ROOT}/skills}"
+SKILLS_DIR="${SKILLS_DIR:-${HOME}/.claude/skills/}"
 FORCE="${FORCE:-0}"
 
 validate_environment() {
@@ -49,14 +38,14 @@ remove_repo_managed_skills() {
     local source_skills
     source_skills="$(list_repo_skills)"
 
-    if [ ! -d "${SKILLS_DIR}" ]; then
-        return 0
-    fi
-
     # Safety: refuse to operate if SKILLS_DIR is empty or root-like
     if [ -z "${SKILLS_DIR}" ] || [ "${SKILLS_DIR}" = "/" ]; then
         printf "ERROR: SKILLS_DIR is unsafe: '%s'\n" "${SKILLS_DIR}" >&2
         return 1
+    fi
+
+    if [ ! -d "${SKILLS_DIR}" ]; then
+        return 0
     fi
 
     printf "Scanning existing skills...\n"
@@ -162,4 +151,6 @@ install_skills() {
     return 0
 }
 
-install_skills
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    install_skills
+fi
