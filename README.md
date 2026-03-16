@@ -6,13 +6,21 @@
 > - **Basic**: Production-ready but actively evolving, expect minor version changes
 > - **Mature**: Stable, battle-tested, changes are rare
 
-Specialized development agents for AI-assisted software work in Claude Code. This repository only manages agent definitions and the global delegation rules that support them. It does not install skills, commands, or external memory infrastructure.
+Specialized development agents and skills for AI-assisted software work in Claude Code. This repository manages agent definitions, global delegation rules, and installable skill bundles.
+
+## Table of Contents
+
+- [Usage](#usage)
+- [How it works](#how-it-works)
+- [Key Considerations](#key-considerations)
+- [Development Considerations](#development-considerations)
+- [Versioning](#versioning)
 
 ## Usage
 
 ### Invoking agents
 
-Main Claude acts as the coordinator. You do not call these agent files directly. Instead, describe the work you need, and Main Claude delegates to the right specialist.
+You can request a specific agent by name, or simply describe the work and let Claude decide which specialists to involve. Either way, Claude handles delegation — you do not invoke agent files directly.
 
 ```text
 User: "Build a user management REST API in Go"
@@ -40,8 +48,6 @@ User: "Review this Go diff for correctness risks"
 
 ### Agent catalog
 
-The repository currently includes agents for:
-
 | Area                     | Agents                                                                                                                                              |
 | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Architecture             | `solutions architect`, `go software architect`, `api architect`, `data architect`                                                                   |
@@ -53,19 +59,35 @@ The repository currently includes agents for:
 
 See [ABOUT-THE-AGENTS.md](agents/ABOUT-THE-AGENTS.md) for workflow examples and role boundaries.
 
+### Skill catalog
+
+Skills are Claude Code workflow prompts installed into `~/.claude/skills/`.
+
+| Skill            | Purpose                                                   |
+| ---------------- | --------------------------------------------------------- |
+| `arch-docs`      | Create and update architecture documentation              |
+| `code-review`    | Orchestrate parallel code review across multiple concerns |
+| `docker-first-ci`| Implement and harden Docker-first CI/CD pipelines         |
+| `prime`          | Prime Claude's context before complex tasks               |
+| `readme-writer`  | Create or update project READMEs from a standard template |
+| `rlm`            | Run long-context tasks using a persistent Python REPL     |
+| `shell-script`   | Generate shell scripts with automatic BATS test coverage  |
+
 ## How it works
 
-This repo ships two things:
+This repo ships three things:
 
 - Agent definition files under `agents/`
 - Global delegation rules in `agents/global-agent-rules.md`
+- Skill bundles under `skills/`
 
-The installer links repo-managed agents into `~/.claude/agents/` and updates the managed rules block in `~/.claude/CLAUDE.md`.
+The installer links repo-managed agents into `~/.claude/agents/`, updates the managed rules block in `~/.claude/CLAUDE.md`, and installs skills into `~/.claude/skills/`.
 
 The installation flow is intentionally small:
 
 1. Install or refresh repo-managed agent symlinks.
 2. Install or refresh the managed global agent rules block.
+3. Install or refresh skill bundles.
 
 User-created agents are preserved. The installer only removes agents whose basenames match files managed by this repository.
 
@@ -77,8 +99,6 @@ User-created agents are preserved. The installer only removes agents whose basen
 
 **The installer preserves user work where possible.** Repo-managed agents are refreshed; unrelated user-created agents in `~/.claude/agents/` are left in place.
 
-**The repo is agents-only.** Skills, command bundles, pattern libraries, and local memory services are out of scope for this project.
-
 ## Development Considerations
 
 ### Quick Start
@@ -89,41 +109,57 @@ User-created agents are preserved. The installer only removes agents whose basen
    make install
    ```
 
-2. Restart Claude Code so it reloads the installed agents and global rules.
+2. Restart Claude Code so it reloads the installed agents, rules, and skills.
 
 3. Review [ABOUT-THE-AGENTS.md](agents/ABOUT-THE-AGENTS.md) before changing delegation behavior.
 
 ### Building & running
 
-The installer is [setup/scripts/installer.sh](setup/scripts/installer.sh). It runs these scripts in sequence:
+The installer is [install/scripts/install.sh](install/scripts/install.sh). It runs these scripts in sequence:
 
 | Script                             | Purpose                                                                                     |
 | ---------------------------------- | ------------------------------------------------------------------------------------------- |
 | `01-install-agents.sh`             | Symlink repo-managed agents into `~/.claude/agents/` while preserving unrelated user agents |
 | `02-install-global-agent-rules.sh` | Update the managed agent rules block in `~/.claude/CLAUDE.md`                               |
+| `03-install-skills.sh`             | Install skill bundles into `~/.claude/skills/`                                              |
 
-Logs are written to `setup/scripts/logs/{TIMESTAMP}/`.
+Logs are written to `install/scripts/logs/{TIMESTAMP}/`.
 
 You can also run the scripts individually:
 
 ```bash
-cd setup
+cd install
 ./scripts/01-install-agents.sh
 ./scripts/02-install-global-agent-rules.sh
+./scripts/03-install-skills.sh
 ```
 
-See [setup/README.md](setup/README.md) for install details and behavior.
+To force reinstall even when dates are current:
+
+```bash
+FORCE=1 ./install/scripts/install.sh
+```
+
+See [install/README.md](install/README.md) for install details and behavior.
 
 ### Testing
 
 Validate the shell scripts with ShellCheck:
 
 ```bash
-shellcheck setup/scripts/*.sh
+shellcheck install/scripts/*.sh
 ```
 
-If you use markdownlint in your environment, run it against the edited docs after documentation changes.
+If you use markdownlint in your environment, run it against edited docs after documentation changes.
 
 ### Versioning
 
-This project does not currently publish semantic version tags. Track changes through the Git history of the repository where you manage this code.
+This project follows [Semantic Versioning 2.0.0](https://semver.org/).
+
+Version is determined from git tags:
+
+```bash
+git describe --tags --always
+```
+
+No tags have been published yet; the current version is `v0.0.1`.

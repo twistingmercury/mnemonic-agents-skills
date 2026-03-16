@@ -41,7 +41,7 @@ $RECYCLE.BIN/
 *.iws
 *.ipr
 out/
-
+**/logs
 # Visual Studio Code
 .vscode/*
 
@@ -79,3 +79,4 @@ docs/scripts/
 **/rlm_state/*
 **/*.backup
 **/local/
+code-reviews

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -e
+set -euo pipefail
 
 SCRIPTS="$(cd "$(dirname "$0")" && pwd)"
 SETUP_DIR="${SETUP_DIR:-$(cd "${SCRIPTS}/.." && pwd)}"
@@ -13,25 +13,31 @@ LOG_FILE="${LOG_DIR}/02-install-global-agent-rules.log"
 
 mkdir -p "${LOG_DIR}"
 exec > >(tee -a "${LOG_FILE}") 2>&1
+trap '{ exec 1>&- 2>&-; wait; }' EXIT
 
 printf "Logging to: %s\n" "${LOG_FILE}"
 
+restore_backup_on_failure() {
+    local exit_code="${1}"
+    local backup="${GLOBAL_CONF}.${TIMESTAMP}.backup"
+    if [ "${exit_code}" -ne 0 ] && [ -f "${backup}" ]; then
+        print::warning "install failed — restoring backup: ${backup}"
+        cp "${backup}" "${GLOBAL_CONF}" || print::error "restore failed: ${backup} -> ${GLOBAL_CONF}"
+    fi
+}
+
 CLAUDE_ROOT="${CLAUDE_ROOT:-${HOME}/.claude}"
+FORCE="${FORCE:-0}"
 GLOBAL_CONF="${CLAUDE_ROOT}/CLAUDE.md"
 AGENT_RULES_SOURCE="${PROJ_ROOT}/agents/global-agent-rules.md"
 
-# shellcheck disable=SC1091
-source "${SETUP_DIR}/lib/print.sh"
+# shellcheck source=../lib/print.sh disable=SC1091
+. "${SETUP_DIR}/lib/print.sh"
 
 ## Not every Claude Code install may have a global Claude.md file.
 ## So when that situation is encountered, we'll need to create it for the user.
 create_global_claude_config(){
     print::info "no global CLAUDE.md file exists - creating"
-
-    touch "${GLOBAL_CONF}" || {
-        print::error "failed to create the new global config: ${GLOBAL_CONF}"
-        return 1
-    }
 
     printf "# CLAUDE.md\n" > "${GLOBAL_CONF}" || {
         print::error "failed to write to new global config: ${GLOBAL_CONF}"
@@ -39,14 +45,17 @@ create_global_claude_config(){
     }
 
     print::success "global CLAUDE.md file created: ${GLOBAL_CONF}"
+    _config_just_created=1
 
     return 0
 }
 
+_config_just_created=0
+
 ## If the user has global Claude.md, we need to back it up in case
 ## something goes wrong, so it can be restored, even if manually.
 backup_global_claude_config(){
-    local backup="${GLOBAL_CONF}.backup"
+    local backup="${GLOBAL_CONF}.${TIMESTAMP}.backup"
 
     cp "${GLOBAL_CONF}" "${backup}" || {
         print::error "failed to backup the global config: ${GLOBAL_CONF}"
@@ -65,10 +74,8 @@ extract_rules_date() {
         return 0
     fi
 
-    # Look for "**Last Updated: YYYY-MM-DD**" pattern
-    grep -E '^\*\*Last Updated: [0-9]{4}-[0-9]{2}-[0-9]{2}\*\*$' "${file}" | \
-        sed -E 's/^\*\*Last Updated: ([0-9]{4}-[0-9]{2}-[0-9]{2})\*\*$/\1/' | \
-        head -n 1
+    # Extract YYYY-MM-DD from "**Last Updated: YYYY-MM-DD**" line
+    sed -n -E 's/^\*\*Last Updated: ([0-9]{4}-[0-9]{2}-[0-9]{2})\*\*$/\1/p' "${file}" | head -n 1
 
     return 0
 }
@@ -81,8 +88,11 @@ has_agent_rules() {
         return 1
     fi
 
-    grep -q "<!-- BEGIN AGENT RULES -->" "${file}"
-    return $?
+    if grep -q "<!-- BEGIN AGENT RULES -->" "${file}"; then
+        return 0
+    else
+        return 1
+    fi
 }
 
 ## Remove existing agent rules section from CLAUDE.md
@@ -126,12 +136,21 @@ compare_dates() {
     local date1="${1}"
     local date2="${2}"
 
+    # Validate both dates are in YYYY-MM-DD format (only format supported)
+    case "${date1}" in
+        [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]) ;;
+        *) printf "ERROR: invalid date format: %s (expected YYYY-MM-DD)\n" "${date1}" >&2; return 1 ;;
+    esac
+    case "${date2}" in
+        [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]) ;;
+        *) printf "ERROR: invalid date format: %s (expected YYYY-MM-DD)\n" "${date2}" >&2; return 1 ;;
+    esac
+
     # Remove hyphens and compare as integers
     local num1="${date1//-/}"
     local num2="${date2//-/}"
 
     [ "${num1}" -ge "${num2}" ]
-    return $?
 }
 
 # Validation
@@ -165,17 +184,21 @@ if has_agent_rules "${GLOBAL_CONF}"; then
 
     if [ -z "${installed_date}" ]; then
         print::warning "found agent rules but could not extract date, will reinstall"
-    elif compare_dates "${installed_date}" "${source_date}"; then
+    elif compare_dates "${installed_date}" "${source_date}" && [ "${FORCE}" -ne 1 ]; then
         print::info "agent rules are up to date (${installed_date})"
         exit 0
     else
         print::info "updating agent rules (old: ${installed_date}, new: ${source_date})"
         backup_global_claude_config || exit 1
+        trap 'restore_backup_on_failure $?' EXIT
         remove_existing_agent_rules "${GLOBAL_CONF}" || exit 1
     fi
 else
     print::info "installing agent rules for the first time (${source_date})"
-    backup_global_claude_config || exit 1
+    if [ "${_config_just_created}" -eq 0 ]; then
+        backup_global_claude_config || exit 1
+        trap 'restore_backup_on_failure $?' EXIT
+    fi
 fi
 
 # Append agent rules to CLAUDE.md

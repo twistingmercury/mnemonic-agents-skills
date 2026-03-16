@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -e
+set -euo pipefail
 
 SCRIPTS="$(cd "$(dirname "$0")" && pwd)"
 SETUP_DIR="${SETUP_DIR:-$(cd "${SCRIPTS}/.." && pwd)}"
@@ -9,15 +9,17 @@ PROJ_ROOT="${PROJ_ROOT:-$(cd "${SETUP_DIR}/.." && pwd)}"
 # Logging setup
 TIMESTAMP="${TIMESTAMP:-$(date +%Y%m%d-%H%M%S)}"
 LOG_DIR="${SCRIPTS}/logs/${TIMESTAMP}"
-LOG_FILE="${LOG_DIR}/02-install-skills.log"
+LOG_FILE="${LOG_DIR}/03-install-skills.log"
 
 mkdir -p "${LOG_DIR}"
 exec > >(tee -a "${LOG_FILE}") 2>&1
+trap '{ exec 1>&- 2>&-; wait; }' EXIT
 
 printf "Logging to: %s\n" "${LOG_FILE}"
 
 SKILL_SOURCE="${PROJ_ROOT}/skills"
 SKILLS_DIR="${HOME}/.claude/skills/"
+FORCE="${FORCE:-0}"
 
 validate_environment() {
     if [ ! -d "${SKILL_SOURCE}" ]; then
@@ -31,7 +33,7 @@ validate_environment() {
 # Build a list of skill directory names from the source.
 # A skill is any subdirectory of skills/ that contains a SKILL.md file.
 list_repo_skills() {
-    find "${SKILL_SOURCE}" -mindepth 1 -maxdepth 1 -type d -exec basename {} \;
+    find "${SKILL_SOURCE}" -mindepth 1 -maxdepth 1 -type d | awk -F/ '{print $NF}'
 }
 
 is_repo_managed_skill() {
@@ -51,6 +53,12 @@ remove_repo_managed_skills() {
         return 0
     fi
 
+    # Safety: refuse to operate if SKILLS_DIR is empty or root-like
+    if [ -z "${SKILLS_DIR}" ] || [ "${SKILLS_DIR}" = "/" ]; then
+        printf "ERROR: SKILLS_DIR is unsafe: '%s'\n" "${SKILLS_DIR}" >&2
+        return 1
+    fi
+
     printf "Scanning existing skills...\n"
 
     for skill_dir in "${SKILLS_DIR}"*/; do
@@ -65,22 +73,26 @@ remove_repo_managed_skills() {
         skill_name="$(basename "${skill_path}")"
         expected_source="${SKILL_SOURCE}/${skill_name}"
 
-        if is_repo_managed_skill "${skill_name}" "${source_skills}"; then
-            if [ -L "${skill_path}" ] && [ -d "${skill_path}" ]; then
-                if [ "$(cd "${skill_path}" && pwd -P)" = "$(cd "${expected_source}" && pwd -P)" ]; then
-                    printf "  Keeping existing symlink: %s\n" "${skill_name}"
-                    preserved_count=$((preserved_count + 1))
-                    continue
-                fi
-            fi
-
-            printf "  Removing repo skill: %s\n" "${skill_name}"
-            rm -rf "${skill_path}"
-            removed_count=$((removed_count + 1))
-        else
+        if ! is_repo_managed_skill "${skill_name}" "${source_skills}"; then
             printf "  Preserving user skill: %s\n" "${skill_name}"
             preserved_count=$((preserved_count + 1))
+            continue
         fi
+
+        if [ "${FORCE}" -ne 1 ] && [ -L "${skill_path}" ] && [ -d "${skill_path}" ] && [ "$(cd "${skill_path}" && pwd -P)" = "$(cd "${expected_source}" && pwd -P)" ]; then
+            printf "  Keeping existing symlink: %s\n" "${skill_name}"
+            preserved_count=$((preserved_count + 1))
+            continue
+        fi
+
+        if [ -z "${skill_path}" ]; then
+            printf "ERROR: resolved empty skill path, skipping\n" >&2
+            continue
+        fi
+
+        printf "  Removing repo skill: %s\n" "${skill_name}"
+        rm -rf "${skill_path}"
+        removed_count=$((removed_count + 1))
     done
 
     printf "Removed %d repo skill(s), preserved %d user skill(s)\n" "${removed_count}" "${preserved_count}"
@@ -91,13 +103,19 @@ symlink_repo_skills() {
     local installed_count=0
     local skipped_count=0
 
+    # Safety: refuse to operate if SKILLS_DIR is empty or root-like
+    if [ -z "${SKILLS_DIR}" ] || [ "${SKILLS_DIR}" = "/" ]; then
+        printf "ERROR: SKILLS_DIR is unsafe: '%s'\n" "${SKILLS_DIR}" >&2
+        return 1
+    fi
+
     printf "Installing repo skills from %s...\n" "${SKILL_SOURCE}"
 
     while IFS= read -r source_dir; do
         local skill_name
         local target_link
         skill_name="$(basename "${source_dir}")"
-        target_link="${SKILLS_DIR}${skill_name}"
+        target_link="${SKILLS_DIR%/}/${skill_name}"
 
         if [ -L "${target_link}" ] && [ -d "${target_link}" ]; then
             printf "  Already installed (symlink exists): %s\n" "${skill_name}"

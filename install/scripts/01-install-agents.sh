@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -e
+set -euo pipefail
 
 SCRIPTS="$(cd "$(dirname "$0")" && pwd)"
 SETUP_DIR="${SETUP_DIR:-$(cd "${SCRIPTS}/.." && pwd)}"
@@ -13,15 +13,20 @@ LOG_FILE="${LOG_DIR}/01-install-agents.log"
 
 mkdir -p "${LOG_DIR}"
 exec > >(tee -a "${LOG_FILE}") 2>&1
+trap '{ exec 1>&- 2>&-; wait; }' EXIT
 
 printf "Logging to: %s\n" "${LOG_FILE}"
 
+# shellcheck source=../lib/print.sh disable=SC1091
+. "${SETUP_DIR}/lib/print.sh"
+
 AGENT_SOURCE="${PROJ_ROOT}/agents"
 AGENTS_DIR="${HOME}/.claude/agents/"
+FORCE="${FORCE:-0}"
 
 validate_environment() {
     if [ ! -d "${AGENT_SOURCE}" ]; then
-        printf "ERROR: cannot locate the projects agent definitions directory: %s\n" "${AGENT_SOURCE}" >&2
+        print::error "cannot locate the projects agent definitions directory: ${AGENT_SOURCE}"
         return 1
     fi
 
@@ -32,7 +37,7 @@ validate_environment() {
 # An agent is any .md file in a subdirectory of agents/ (excludes top-level files
 # like ABOUT-THE-AGENTS.md).
 list_repo_agents() {
-    find "${AGENT_SOURCE}" -mindepth 2 -type f -name "*.md" -not -path "*/commands/*" -exec basename {} \;
+    find "${AGENT_SOURCE}" -mindepth 2 -type f -name "*.md" -not -path "*/commands/*" | awk -F/ '{print $NF}'
 }
 
 
@@ -66,24 +71,31 @@ remove_repo_managed_agents() {
         local agent_name
         local expected_source
         agent_name="$(basename "${agent_file}")"
-        expected_source="$(find "${AGENT_SOURCE}" -mindepth 2 -type f -name "${agent_name}" -not -path "*/commands/*" | head -n 1)"
 
-        if is_repo_managed_agent "${agent_name}" "${source_agents}"; then
-            if [ -L "${agent_file}" ] && [ -n "${expected_source}" ]; then
-                if [ "$(readlink "${agent_file}")" = "${expected_source}" ]; then
-                    printf "  Keeping existing symlink: %s\n" "${agent_name}"
-                    preserved_count=$((preserved_count + 1))
-                    continue
-                fi
-            fi
-
-            printf "  Removing repo agent: %s\n" "${agent_name}"
+        # Remove broken symlinks unconditionally
+        if [ -L "${agent_file}" ] && [ ! -e "${agent_file}" ]; then
+            printf "  Removing broken symlink: %s\n" "${agent_name}"
             rm -f "${agent_file}"
             removed_count=$((removed_count + 1))
-        else
+            continue
+        fi
+        expected_source="$(find "${AGENT_SOURCE}" -mindepth 2 -type f -name "${agent_name}" -not -path "*/commands/*" | head -n 1)"
+
+        if ! is_repo_managed_agent "${agent_name}" "${source_agents}"; then
             printf "  Preserving user agent: %s\n" "${agent_name}"
             preserved_count=$((preserved_count + 1))
+            continue
         fi
+
+        if [ "${FORCE}" -ne 1 ] && [ -L "${agent_file}" ] && [ -n "${expected_source}" ] && [ "$(readlink "${agent_file}")" = "${expected_source}" ]; then
+            printf "  Keeping existing symlink: %s\n" "${agent_name}"
+            preserved_count=$((preserved_count + 1))
+            continue
+        fi
+
+        printf "  Removing repo agent: %s\n" "${agent_name}"
+        rm -f "${agent_file}"
+        removed_count=$((removed_count + 1))
     done
 
     printf "Removed %d repo agent(s), preserved %d user agent(s)\n" "${removed_count}" "${preserved_count}"
@@ -100,7 +112,7 @@ symlink_repo_agents() {
         local agent_name
         local target_link
         agent_name="$(basename "${source_file}")"
-        target_link="${AGENTS_DIR}${agent_name}"
+        target_link="${AGENTS_DIR%/}/${agent_name}"
 
         if [ -L "${target_link}" ]; then
             printf "  Already installed (symlink exists): %s\n" "${agent_name}"
@@ -134,16 +146,16 @@ install_agents() {
     fi
 
     if ! remove_repo_managed_agents; then
-        printf "ERROR: failed to remove repo agents\n" >&2
+        print::error "failed to remove repo agents"
         return 1
     fi
 
     if ! symlink_repo_agents; then
-        printf "ERROR: failed to install repo agents\n" >&2
+        print::error "failed to install repo agents"
         return 1
     fi
 
-    printf "\nSUCCESS: all agents updated\n"
+    print::success "all agents updated"
     return 0
 }
 
