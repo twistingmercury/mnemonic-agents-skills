@@ -10,6 +10,7 @@ setup() {
     export PROJ_ROOT="${TEST_TMP}"
     export SETUP_DIR="${SCRIPT_DIR}"
 
+    # shellcheck source=../scripts/03-install-skills.sh
     # Entry point guard prevents install_skills from running on source
     source "${SCRIPT_DIR}/scripts/03-install-skills.sh"
 }
