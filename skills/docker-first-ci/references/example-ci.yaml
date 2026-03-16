@@ -1,0 +1,33 @@
+name: Example CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build + test through Docker-first entrypoint
+        run: ./build/build.sh
+
+      - name: Export image artifact for CD
+        if: github.event_name == 'push'
+        run: docker save ghcr.io/example-org/example-service:latest -o image.tar
+
+      - name: Upload image artifact
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-image
+          path: image.tar
+          retention-days: 1

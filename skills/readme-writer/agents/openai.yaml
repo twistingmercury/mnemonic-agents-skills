@@ -1,0 +1,4 @@
+interface:
+  display_name: "README Writer"
+  short_description: "Create concise, onboarding-first project READMEs"
+  default_prompt: "Use $readme-writer to create or refresh the project README.md with a concise onboarding structure."

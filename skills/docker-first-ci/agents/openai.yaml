@@ -1,0 +1,4 @@
+interface:
+  display_name: "Docker-First CI/CD Implementation"
+  short_description: "Implement and harden Docker-first CI/CD workflows"
+  default_prompt: "Use this skill to implement Docker-first CI/CD, enforce immutable CI-to-CD handoff, and apply safe release gates."

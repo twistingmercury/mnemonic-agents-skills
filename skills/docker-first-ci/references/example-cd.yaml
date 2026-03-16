@@ -1,0 +1,44 @@
+name: Example CD
+
+on:
+  workflow_run:
+    workflows: ["Example CI"]
+    types: [completed]
+    branches: [main, develop]
+
+jobs:
+  publish:
+    # Gate CD to successful CI runs triggered by push events only.
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      actions: read
+    steps:
+      - name: Download image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-image
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Load CI-built image
+        run: docker load -i image.tar
+
+      - name: Login to registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push immutable outputs
+        run: |
+          BRANCH="${{ github.event.workflow_run.head_branch }}"
+          SAFE_BRANCH="${BRANCH//\//-}"
+          if [[ "$BRANCH" == "main" ]]; then
+            docker push ghcr.io/example-org/example-service:latest
+          fi
+          docker tag ghcr.io/example-org/example-service:latest ghcr.io/example-org/example-service:${SAFE_BRANCH}
+          docker push ghcr.io/example-org/example-service:${SAFE_BRANCH}
