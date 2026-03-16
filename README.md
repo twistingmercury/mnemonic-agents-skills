@@ -1,6 +1,7 @@
 # Claude Code Agent Ecosystem
 
 > **Maturity Level**: Basic - Ready for use. The agent catalog is usable now and will continue to evolve as workflows improve.
+> **Version**: v1.0.0
 >
 > - **Emerging**: Prototype, not production-ready, expect breaking changes
 > - **Basic**: Production-ready but actively evolving, expect minor version changes
@@ -165,4 +166,4 @@ Version is determined from git tags:
 git describe --tags --always
 ```
 
-No tags have been published yet; the current version is `v0.0.1`.
+Current version: `v1.0.0`.
