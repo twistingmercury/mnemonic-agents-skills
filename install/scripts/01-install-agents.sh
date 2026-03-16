@@ -6,22 +6,11 @@ SCRIPTS="$(cd "$(dirname "$0")" && pwd)"
 SETUP_DIR="${SETUP_DIR:-$(cd "${SCRIPTS}/.." && pwd)}"
 PROJ_ROOT="${PROJ_ROOT:-$(cd "${SETUP_DIR}/.." && pwd)}"
 
-# Logging setup
-TIMESTAMP="${TIMESTAMP:-$(date +%Y%m%d-%H%M%S)}"
-LOG_DIR="${SCRIPTS}/logs/${TIMESTAMP}"
-LOG_FILE="${LOG_DIR}/01-install-agents.log"
-
-mkdir -p "${LOG_DIR}"
-exec > >(tee -a "${LOG_FILE}") 2>&1
-trap '{ exec 1>&- 2>&-; wait; }' EXIT
-
-printf "Logging to: %s\n" "${LOG_FILE}"
-
 # shellcheck source=../lib/print.sh disable=SC1091
 . "${SETUP_DIR}/lib/print.sh"
 
-AGENT_SOURCE="${PROJ_ROOT}/agents"
-AGENTS_DIR="${HOME}/.claude/agents/"
+AGENT_SOURCE="${AGENT_SOURCE:-${PROJ_ROOT}/agents}"
+AGENTS_DIR="${AGENTS_DIR:-${HOME}/.claude/agents/}"
 FORCE="${FORCE:-0}"
 
 validate_environment() {
@@ -159,4 +148,6 @@ install_agents() {
     return 0
 }
 
-install_agents
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    install_agents
+fi
