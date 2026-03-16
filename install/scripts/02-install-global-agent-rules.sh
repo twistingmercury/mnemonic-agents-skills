@@ -5,17 +5,7 @@ set -euo pipefail
 SCRIPTS="$(cd "$(dirname "$0")" && pwd)"
 SETUP_DIR="${SETUP_DIR:-$(cd "${SCRIPTS}/.." && pwd)}"
 PROJ_ROOT="${PROJ_ROOT:-$(cd "${SETUP_DIR}/.." && pwd)}"
-
-# Logging setup
 TIMESTAMP="${TIMESTAMP:-$(date +%Y%m%d-%H%M%S)}"
-LOG_DIR="${SCRIPTS}/logs/${TIMESTAMP}"
-LOG_FILE="${LOG_DIR}/02-install-global-agent-rules.log"
-
-mkdir -p "${LOG_DIR}"
-exec > >(tee -a "${LOG_FILE}") 2>&1
-trap '{ exec 1>&- 2>&-; wait; }' EXIT
-
-printf "Logging to: %s\n" "${LOG_FILE}"
 
 restore_backup_on_failure() {
     local exit_code="${1}"
@@ -29,7 +19,7 @@ restore_backup_on_failure() {
 CLAUDE_ROOT="${CLAUDE_ROOT:-${HOME}/.claude}"
 FORCE="${FORCE:-0}"
 GLOBAL_CONF="${CLAUDE_ROOT}/CLAUDE.md"
-AGENT_RULES_SOURCE="${PROJ_ROOT}/agents/global-agent-rules.md"
+AGENT_RULES_SOURCE="${AGENT_RULES_SOURCE:-${PROJ_ROOT}/agents/global-agent-rules.md}"
 
 # shellcheck source=../lib/print.sh disable=SC1091
 . "${SETUP_DIR}/lib/print.sh"
@@ -49,8 +39,6 @@ create_global_claude_config(){
 
     return 0
 }
-
-_config_just_created=0
 
 ## If the user has global Claude.md, we need to back it up in case
 ## something goes wrong, so it can be restored, even if manually.
@@ -153,58 +141,67 @@ compare_dates() {
     [ "${num1}" -ge "${num2}" ]
 }
 
-# Validation
-if [ ! -f "${AGENT_RULES_SOURCE}" ]; then
-    print::error "could not locate agent rules source file: ${AGENT_RULES_SOURCE}"
-    exit 1
-fi
+install_global_agent_rules() {
+    local _config_just_created=0
 
-if [ ! -d "${CLAUDE_ROOT}" ]; then
-    print::error "could not locate expected config for Claude Code: ${CLAUDE_ROOT}"
-    exit 1
-fi
+    # Validation
+    if [ ! -f "${AGENT_RULES_SOURCE}" ]; then
+        print::error "could not locate agent rules source file: ${AGENT_RULES_SOURCE}"
+        return 1
+    fi
 
-# Create global CLAUDE.md if it doesn't exist
-if [ ! -f "${GLOBAL_CONF}" ]; then
-    create_global_claude_config || exit 1
-fi
+    if [ ! -d "${CLAUDE_ROOT}" ]; then
+        print::error "could not locate expected config for Claude Code: ${CLAUDE_ROOT}"
+        return 1
+    fi
 
-# Extract source date from agent rules
-source_date=$(extract_rules_date "${AGENT_RULES_SOURCE}")
+    # Create global CLAUDE.md if it doesn't exist
+    if [ ! -f "${GLOBAL_CONF}" ]; then
+        create_global_claude_config || return 1
+    fi
 
-if [ -z "${source_date}" ]; then
-    print::error "could not extract date from agent rules source: ${AGENT_RULES_SOURCE}"
-    exit 1
-fi
+    # Extract source date from agent rules
+    local source_date
+    source_date=$(extract_rules_date "${AGENT_RULES_SOURCE}")
 
-# Check if agent rules already exist in CLAUDE.md
-if has_agent_rules "${GLOBAL_CONF}"; then
-    # Extract installed date
-    installed_date=$(extract_rules_date "${GLOBAL_CONF}")
+    if [ -z "${source_date}" ]; then
+        print::error "could not extract date from agent rules source: ${AGENT_RULES_SOURCE}"
+        return 1
+    fi
 
-    if [ -z "${installed_date}" ]; then
-        print::warning "found agent rules but could not extract date, will reinstall"
-    elif compare_dates "${installed_date}" "${source_date}" && [ "${FORCE}" -ne 1 ]; then
-        print::info "agent rules are up to date (${installed_date})"
-        exit 0
+    # Check if agent rules already exist in CLAUDE.md
+    if has_agent_rules "${GLOBAL_CONF}"; then
+        local installed_date
+        installed_date=$(extract_rules_date "${GLOBAL_CONF}")
+
+        if [ -z "${installed_date}" ]; then
+            print::warning "found agent rules but could not extract date, will reinstall"
+        elif compare_dates "${installed_date}" "${source_date}" && [ "${FORCE}" -ne 1 ]; then
+            print::info "agent rules are up to date (${installed_date})"
+            return 0
+        else
+            print::info "updating agent rules (old: ${installed_date}, new: ${source_date})"
+            backup_global_claude_config || return 1
+            trap 'restore_backup_on_failure $?' RETURN
+            remove_existing_agent_rules "${GLOBAL_CONF}" || return 1
+        fi
     else
-        print::info "updating agent rules (old: ${installed_date}, new: ${source_date})"
-        backup_global_claude_config || exit 1
-        trap 'restore_backup_on_failure $?' EXIT
-        remove_existing_agent_rules "${GLOBAL_CONF}" || exit 1
+        print::info "installing agent rules for the first time (${source_date})"
+        if [ "${_config_just_created}" -eq 0 ]; then
+            backup_global_claude_config || return 1
+            trap 'restore_backup_on_failure $?' RETURN
+        fi
     fi
-else
-    print::info "installing agent rules for the first time (${source_date})"
-    if [ "${_config_just_created}" -eq 0 ]; then
-        backup_global_claude_config || exit 1
-        trap 'restore_backup_on_failure $?' EXIT
-    fi
-fi
 
-# Append agent rules to CLAUDE.md
-cat "${AGENT_RULES_SOURCE}" >> "${GLOBAL_CONF}" || {
-    print::error "failed to append agent rules to global config: ${GLOBAL_CONF}"
-    exit 1
+    # Append agent rules to CLAUDE.md
+    cat "${AGENT_RULES_SOURCE}" >> "${GLOBAL_CONF}" || {
+        print::error "failed to append agent rules to global config: ${GLOBAL_CONF}"
+        return 1
+    }
+
+    print::success "agent rules written to global CLAUDE.md (${source_date})"
 }
 
-print::success "agent rules written to global CLAUDE.md (${source_date})"
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    install_global_agent_rules
+fi
