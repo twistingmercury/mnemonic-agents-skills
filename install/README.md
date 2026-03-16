@@ -1,21 +1,18 @@
-# Agent Setup
+# Install
 
-This directory contains the installer and helper scripts for the agents in this repository. The setup is limited to two tasks:
+This directory contains the installer and helper scripts for this repository. The installer handles three tasks:
 
-- Install repo-managed agents into `~/.claude/agents/`
+- Symlink repo-managed agents into `~/.claude/agents/`
 - Install the managed global rules block into `~/.claude/CLAUDE.md`
-
-It does not provision Docker services, skills, commands, or external memory infrastructure.
+- Symlink skill bundles into `~/.claude/skills/`
 
 ## Prerequisites
-
-Before running setup, make sure you have:
 
 - Claude Code installed
 - A writable `~/.claude/` directory
 - Bash 4.x or newer
 
-ShellCheck is recommended if you want to validate the scripts locally.
+ShellCheck and [bats](https://github.com/bats-core/bats-core) are recommended for local development.
 
 ## Quick Start
 
@@ -25,75 +22,91 @@ From the repository root:
 make install
 ```
 
-Or from this directory:
+Or directly:
 
 ```bash
-./scripts/installer.sh
+./install/scripts/install.sh
 ```
 
-The installer runs two steps:
+The installer runs three steps in sequence and stops on the first failure.
 
-1. `01-install-agents.sh`
-2. `02-install-global-agent-rules.sh`
+Restart Claude Code after installation so the updated agents, rules, and skills are picked up.
 
-Logs are written to `scripts/logs/{TIMESTAMP}/`.
-
-Restart Claude Code after installation so the updated agents and global rules are picked up.
-
-## Manual Setup
-
-If you want to run each step yourself:
+## Manual Steps
 
 ### 01-install-agents.sh
 
-Installs agent definition symlinks into `~/.claude/agents/`.
+Symlinks agent definition files into `~/.claude/agents/`.
 
 ```bash
-./scripts/01-install-agents.sh
+./install/scripts/01-install-agents.sh
 ```
 
 Behavior:
 
 - Creates `~/.claude/agents/` if it does not exist
-- Removes and replaces repo-managed agents
+- Removes stale or broken repo-managed agent symlinks
+- Creates fresh symlinks for all current repo agents
 - Preserves unrelated user-created agents
-- Logs to `scripts/logs/{TIMESTAMP}/01-install-agents.log`
 
 ### 02-install-global-agent-rules.sh
 
 Installs the managed rules block from `agents/global-agent-rules.md` into `~/.claude/CLAUDE.md`.
 
 ```bash
-./scripts/02-install-global-agent-rules.sh
+./install/scripts/02-install-global-agent-rules.sh
 ```
 
 Behavior:
 
-- Creates `~/.claude/CLAUDE.md` if needed
-- Backs up the existing file to `~/.claude/CLAUDE.md.backup`
+- Creates `~/.claude/CLAUDE.md` if needed (skips backup for a just-created file)
+- Backs up existing file to `~/.claude/CLAUDE.md.<timestamp>.backup` before changes
 - Replaces the block between `<!-- BEGIN AGENT RULES -->` and `<!-- END AGENT RULES -->`
-- Logs to `scripts/logs/{TIMESTAMP}/02-install-global-agent-rules.log`
+- Skips update if the installed rules are already at least as recent as the source, unless `FORCE=1`
 
-## Installer Behavior
+### 03-install-skills.sh
 
-The top-level installer is `scripts/installer.sh`. It sets a shared timestamp, runs both setup steps, and stops on the first failure.
+Symlinks skill bundles into `~/.claude/skills/`.
 
-This script does not install anything outside the agent catalog and managed global rules block.
+```bash
+./install/scripts/03-install-skills.sh
+```
+
+Behavior:
+
+- Creates `~/.claude/skills/` if it does not exist
+- Removes stale or broken repo-managed skill symlinks
+- Creates fresh symlinks for all current repo skills
+- Preserves unrelated user-created skills
+
+## Force Reinstall
+
+To reinstall even when dates are current:
+
+```bash
+FORCE=1 ./install/scripts/install.sh
+```
+
+## Testing
+
+The installer scripts have BATS unit tests in `install/tests/`. Run them with:
+
+```bash
+make test
+```
 
 ## Troubleshooting
 
 ### `~/.claude` does not exist
 
-Create the directory first:
-
 ```bash
 mkdir -p ~/.claude
 ```
 
-### Agents do not appear in Claude Code
+### Agents or skills do not appear in Claude Code
 
 Restart Claude Code after running the installer.
 
 ### Global rules were overwritten unexpectedly
 
-Check `~/.claude/CLAUDE.md.backup`. The installer creates a backup before it updates an existing file.
+Check for a `~/.claude/CLAUDE.md.<timestamp>.backup` file. The installer creates a backup before updating an existing config.

@@ -123,15 +123,12 @@ The installer is [install/scripts/install.sh](install/scripts/install.sh). It ru
 | `02-install-global-agent-rules.sh` | Update the managed agent rules block in `~/.claude/CLAUDE.md`                               |
 | `03-install-skills.sh`             | Install skill bundles into `~/.claude/skills/`                                              |
 
-Logs are written to `install/scripts/logs/{TIMESTAMP}/`.
-
 You can also run the scripts individually:
 
 ```bash
-cd install
-./scripts/01-install-agents.sh
-./scripts/02-install-global-agent-rules.sh
-./scripts/03-install-skills.sh
+./install/scripts/01-install-agents.sh
+./install/scripts/02-install-global-agent-rules.sh
+./install/scripts/03-install-skills.sh
 ```
 
 To force reinstall even when dates are current:
@@ -143,6 +140,12 @@ FORCE=1 ./install/scripts/install.sh
 See [install/README.md](install/README.md) for install details and behavior.
 
 ### Testing
+
+Run the BATS unit test suite (requires `bats` on `PATH`):
+
+```bash
+make test
+```
 
 Validate the shell scripts with ShellCheck:
 
