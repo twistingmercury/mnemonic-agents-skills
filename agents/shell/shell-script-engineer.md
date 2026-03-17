@@ -25,7 +25,7 @@ tools:
   - "Bash(grep *)"
   - "Bash(ls *)"
   - "Bash(cat *)"
-  - "Bash(shellcheck *)",
+  - "Bash(shellcheck *)"
   - "Bash(wc *)"
   - "Glob(**/*.sh)"
   - "Glob(**/scripts/**)"
