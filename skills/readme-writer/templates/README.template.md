@@ -6,11 +6,14 @@ Keep it concise and ensure the navigation table stays current.
 
 # {PROJECT_NAME}
 
-> **Maturity Level**: Emerging|Basic|Mature -
->
+> **Maturity Level**: Emerging|Basic|Mature - <!-- Add a brief sentance about the maturity level  -->
+> **Version**: <!-- If no tags are present, always fall back to version v0.0.1. -->
+
 > - **Emerging**: Prototype, not production-ready, expect breaking changes
 > - **Basic**: Production-ready but actively evolving, expect minor version changes
 > - **Mature**: Stable, battle-tested, changes are rare
+
+---
 
 ## Table of Contents
 
@@ -22,7 +25,7 @@ Keep it concise and ensure the navigation table stays current.
 
 ## Usage
 
-<!-- 
+<!--
 Summarize the most common usage. Keep this brief.
 If setup or getting-started steps are long, move them to a dedicated doc and link it here.
 -->
@@ -38,10 +41,6 @@ If setup or getting-started steps are long, move them to a dedicated doc and lin
 ### Testing
 
 ### Versioning
-
-<!--
-If no tags are present, always fall back to version v0.0.1.
--->
 
 This project follows [Semantic Versioning 2.0.0](https://semver.org/).
 
