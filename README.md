@@ -1,4 +1,4 @@
-# Claude Code Agent Ecosystem
+# Claude Code and Codex Agent Ecosystem
 
 > **Maturity Level**: Basic - Ready for use. The agent catalog is usable now and will continue to evolve as workflows improve.
 > **Version**: v1.0.0
@@ -7,7 +7,7 @@
 > - **Basic**: Production-ready but actively evolving, expect minor version changes
 > - **Mature**: Stable, battle-tested, changes are rare
 
-Specialized development agents and skills for AI-assisted software work in Claude Code. This repository manages agent definitions, global delegation rules, and installable skill bundles.
+Specialized development agents and skills for AI-assisted software work in Claude Code and Codex. Platform-specific integrations are isolated while portable skills remain shared.
 
 ## Table of Contents
 
@@ -58,11 +58,11 @@ User: "Review this Go diff for correctness risks"
 | Documentation and review | `technical writer`, `code reviewer`                                                                                                                 |
 | Support                  | `rlm subcall agent`                                                                                                                                 |
 
-See [ABOUT-THE-AGENTS.md](agents/ABOUT-THE-AGENTS.md) for workflow examples and role boundaries.
+See [ABOUT-THE-AGENTS.md](agents/claude/ABOUT-THE-AGENTS.md) for Claude Code workflow examples and role boundaries. Native Codex TOML definitions are available under `agents/codex/`; installation support is the next migration step.
 
 ### Skill catalog
 
-Skills are Claude Code workflow prompts installed into `~/.claude/skills/`.
+Portable skills live under `skills/shared/`; platform-specific skills live under `skills/claude/` or `skills/codex/`. Claude Code installs shared and Claude-specific skills into `~/.claude/skills/`. Codex installs shared and Codex-specific skills into `~/.agents/skills/`.
 
 | Skill            | Purpose                                                   |
 | ---------------- | --------------------------------------------------------- |
@@ -78,11 +78,11 @@ Skills are Claude Code workflow prompts installed into `~/.claude/skills/`.
 
 This repo ships three things:
 
-- Agent definition files under `agents/`
-- Global delegation rules in `agents/global-agent-rules.md`
-- Skill bundles under `skills/`
+- Platform-specific agent definitions under `agents/claude/` and `agents/codex/`
+- Platform-specific global guidance alongside each agent catalog
+- Shared and platform-specific skill bundles under `skills/`
 
-The installer links repo-managed agents into `~/.claude/agents/`, updates the managed rules block in `~/.claude/CLAUDE.md`, and installs skills into `~/.claude/skills/`.
+Installers are separated under `install/claude/` and `install/codex/`. The Claude installer links agents, updates `~/.claude/CLAUDE.md`, and installs applicable skills. The initial Codex installer installs shared and Codex-specific skills; native Codex agent and `AGENTS.md` installation will be added with the agent ports.
 
 The installation flow is intentionally small:
 
@@ -96,7 +96,7 @@ User-created agents are preserved. The installer only removes agents whose basen
 
 **This is a reference implementation, not a framework.** Adapt the agent prompts and delegation model to match your own workflow.
 
-**Global rules are part of the install.** Running the installer updates the managed rules block in `~/.claude/CLAUDE.md` using the contents of `agents/global-agent-rules.md`. Review that file before installing if you maintain custom coordination rules.
+**Global rules are part of the Claude install.** Running the Claude installer updates the managed rules block in `~/.claude/CLAUDE.md` using `agents/claude/global-agent-rules.md`. Review that file before installing if you maintain custom coordination rules.
 
 **The installer preserves user work where possible.** Repo-managed agents are refreshed; unrelated user-created agents in `~/.claude/agents/` are left in place.
 
@@ -104,19 +104,22 @@ User-created agents are preserved. The installer only removes agents whose basen
 
 ### Quick Start
 
-1. Run the installer:
+1. Run the installer for the desired platform:
 
    ```bash
-   make install
+   make install-claude
+   make install-codex
    ```
 
-2. Restart Claude Code so it reloads the installed agents, rules, and skills.
+   Use `make install-all` to install both integrations. `make install` remains an alias for `make install-claude`.
 
-3. Review [ABOUT-THE-AGENTS.md](agents/ABOUT-THE-AGENTS.md) before changing delegation behavior.
+2. Restart the target client so it reloads installed agents, rules, and skills.
+
+3. Review [ABOUT-THE-AGENTS.md](agents/claude/ABOUT-THE-AGENTS.md) before changing Claude Code delegation behavior.
 
 ### Building & running
 
-The installer is [install/scripts/install.sh](install/scripts/install.sh). It runs these scripts in sequence:
+The Claude installer is [install.sh](install/claude/scripts/install.sh). It runs these scripts in sequence:
 
 | Script                             | Purpose                                                                                     |
 | ---------------------------------- | ------------------------------------------------------------------------------------------- |
@@ -127,15 +130,15 @@ The installer is [install/scripts/install.sh](install/scripts/install.sh). It ru
 You can also run the scripts individually:
 
 ```bash
-./install/scripts/01-install-agents.sh
-./install/scripts/02-install-global-agent-rules.sh
-./install/scripts/03-install-skills.sh
+./install/claude/scripts/01-install-agents.sh
+./install/claude/scripts/02-install-global-agent-rules.sh
+./install/claude/scripts/03-install-skills.sh
 ```
 
 To force reinstall even when dates are current:
 
 ```bash
-FORCE=1 ./install/scripts/install.sh
+FORCE=1 ./install/claude/scripts/install.sh
 ```
 
 See [install/README.md](install/README.md) for install details and behavior.
@@ -151,7 +154,7 @@ make test
 Validate the shell scripts with ShellCheck:
 
 ```bash
-shellcheck install/scripts/*.sh
+shellcheck install/claude/scripts/*.sh install/codex/scripts/*.sh
 ```
 
 If you use markdownlint in your environment, run it against edited docs after documentation changes.

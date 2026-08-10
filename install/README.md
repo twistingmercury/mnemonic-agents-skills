@@ -1,6 +1,8 @@
 # Install
 
-This directory contains the installer and helper scripts for this repository. The installer handles three tasks:
+This directory contains platform-specific installers and shared helper scripts.
+
+The Claude Code installer handles three tasks:
 
 - Symlink repo-managed agents into `~/.claude/agents/`
 - Install the managed global rules block into `~/.claude/CLAUDE.md`
@@ -16,30 +18,34 @@ ShellCheck and [bats](https://github.com/bats-core/bats-core) are recommended fo
 
 ## Quick Start
 
-From the repository root:
+From the repository root, install the desired integration:
 
 ```bash
-make install
+make install-claude
+make install-codex
 ```
 
-Or directly:
+Install both with `make install-all`. `make install` remains an alias for the Claude Code integration.
+
+The platform entrypoints can also be run directly:
 
 ```bash
-./install/scripts/install.sh
+./install/claude/scripts/install.sh
+./install/codex/scripts/install.sh
 ```
 
-The installer runs three steps in sequence and stops on the first failure.
+Each installer stops on its first failure.
 
 Restart Claude Code after installation so the updated agents, rules, and skills are picked up.
 
-## Manual Steps
+## Claude Code Manual Steps
 
 ### 01-install-agents.sh
 
 Symlinks agent definition files into `~/.claude/agents/`.
 
 ```bash
-./install/scripts/01-install-agents.sh
+./install/claude/scripts/01-install-agents.sh
 ```
 
 Behavior:
@@ -51,10 +57,10 @@ Behavior:
 
 ### 02-install-global-agent-rules.sh
 
-Installs the managed rules block from `agents/global-agent-rules.md` into `~/.claude/CLAUDE.md`.
+Installs the managed rules block from `agents/claude/global-agent-rules.md` into `~/.claude/CLAUDE.md`.
 
 ```bash
-./install/scripts/02-install-global-agent-rules.sh
+./install/claude/scripts/02-install-global-agent-rules.sh
 ```
 
 Behavior:
@@ -69,7 +75,7 @@ Behavior:
 Symlinks skill bundles into `~/.claude/skills/`.
 
 ```bash
-./install/scripts/03-install-skills.sh
+./install/claude/scripts/03-install-skills.sh
 ```
 
 Behavior:
@@ -79,17 +85,28 @@ Behavior:
 - Creates fresh symlinks for all current repo skills
 - Preserves unrelated user-created skills
 
+## Codex Manual Steps
+
+The initial Codex installer installs portable skills from `skills/shared/` and native Codex skills from `skills/codex/` into `~/.agents/skills/`:
+
+```bash
+./install/codex/scripts/03-install-skills.sh
+```
+
+Native Codex agent definitions are stored under `agents/codex/` and validated by `install/codex/tests/`. Codex agent and global `AGENTS.md` installation will be added next.
+
 ## Force Reinstall
 
 To reinstall even when dates are current:
 
 ```bash
-FORCE=1 ./install/scripts/install.sh
+FORCE=1 ./install/claude/scripts/install.sh
+FORCE=1 ./install/codex/scripts/install.sh
 ```
 
 ## Testing
 
-The installer scripts have BATS unit tests in `install/tests/`. Run them with:
+The Claude installer scripts have BATS unit tests in `install/claude/tests/`. Run them with:
 
 ```bash
 make test

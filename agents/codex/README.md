@@ -1,0 +1,14 @@
+# Codex Agents
+
+This directory contains native Codex custom-agent definitions. The roles parallel the Claude Code catalog, but their operating instructions are tailored to Codex delegation, sandboxing, tool availability, validation, and parent-agent handoff behavior.
+
+Each TOML file defines:
+
+- `name`: a stable `snake_case` identifier used for delegation
+- `description`: concise routing guidance for the parent agent
+- `sandbox_mode`: `read-only` for advisory roles or `workspace-write` for artifact-producing roles
+- `developer_instructions`: Codex-specific operating constraints followed by focused role instructions
+
+Model settings are intentionally omitted so each custom agent inherits the active Codex session model and reasoning configuration. Optional skills and MCP services degrade gracefully when unavailable. Claude-specific metadata and tool allowlists are not used because Codex custom agents use Codex configuration, sandboxing, approvals, and inherited tool settings.
+
+The source tree retains language and responsibility groupings for maintainability. The Codex installer will flatten the TOML definitions into `~/.codex/agents/`, where Codex discovers personal custom agents.
