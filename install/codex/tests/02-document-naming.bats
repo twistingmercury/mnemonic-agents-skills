@@ -47,7 +47,7 @@ PY
     [ "$status" -eq 1 ]
 
     run grep -F -- 'docs/code_reviews/phase_09_routing_engine_v01.md' \
-        "${REPO_ROOT}/skills/claude/code-review/SKILL.md"
+        "${REPO_ROOT}/skills/shared/code-review/SKILL.md"
     [ "$status" -eq 0 ]
 }
 
@@ -90,9 +90,9 @@ PY
 @test "documentation-producing skills define published-document behavior" {
     local skill
     local skills=(
-        claude/code-review/SKILL.md
+        shared/code-review/SKILL.md
         shared/ralph-loop-docs-writer/SKILL.md
-        claude/shell-script/SKILL.md
+        shared/shell-script/SKILL.md
         shared/arch-docs/SKILL.md
         shared/docker-first-ci/SKILL.md
         shared/readme-writer/SKILL.md

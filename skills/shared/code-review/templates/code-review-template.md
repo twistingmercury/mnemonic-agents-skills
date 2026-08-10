@@ -75,7 +75,7 @@ Code review fixes introduced divergences between the implementation and the desi
 
 ## Patterns to Document
 
-Patterns identified that should be added to the patterns and examples for Claude Code's sub agents.
+Patterns identified that should be added to the project's guidance for installed subagents.
 
 1. [pattern]
 
