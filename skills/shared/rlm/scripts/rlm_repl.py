@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
-# I want to give credit where credit is due; this is not my creation. I got it from this post Zero-Setup RLMs with Claude Code (https://www.youtube.com/watch?v=m6itCxJFqpo)
+# Adapted from the Zero-Setup RLM workflow described at https://www.youtube.com/watch?v=m6itCxJFqpo.
 
-"""Persistent mini-REPL for RLM-style workflows in Claude Code.
+"""Persistent mini-REPL for agent-agnostic RLM-style workflows.
 
 This script provides a *stateful* Python environment across invocations by
 saving a pickle file to disk. It is intentionally small and dependency-free.
@@ -53,7 +53,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
 
-DEFAULT_STATE_PATH = Path(".claude/rlm_state/state.pkl")
+DEFAULT_STATE_PATH = Path(".mnemonic/rlm_state/state.pkl")
 DEFAULT_MAX_OUTPUT_CHARS = 8000
 DEFAULT_INCLUDE_EXTS = {
     ".txt",

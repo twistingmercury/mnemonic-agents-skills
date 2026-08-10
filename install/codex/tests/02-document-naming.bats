@@ -91,7 +91,7 @@ PY
     local skill
     local skills=(
         claude/code-review/SKILL.md
-        claude/ralph-loop-docs-writer/SKILL.md
+        shared/ralph-loop-docs-writer/SKILL.md
         claude/shell-script/SKILL.md
         shared/arch-docs/SKILL.md
         shared/docker-first-ci/SKILL.md

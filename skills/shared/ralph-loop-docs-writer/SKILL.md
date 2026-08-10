@@ -1,22 +1,22 @@
 ---
 name: ralph-loop-docs-writer
-description: Use when writing PRD.md or PROMPT.md files for use with gralph ralph loops — iterative Claude Code automation driven by a checklist-based PRD and per-iteration prompt
+description: Create or update PRD.md and PROMPT.md files for agent-agnostic gralph loops driven by a checklist and a one-cycle execution prompt. Use when defining or maintaining iterative gralph automation.
 ---
 
 # Ralph Loop Docs
 
 ## Overview
 
-A **ralph loop** drives Claude Code through a PRD checklist one item at a time:
+A **ralph loop** drives the coding agent configured in `gralph` through a PRD checklist one item at a time. Before running a loop, inspect `gralph --help` and use the installed version's agent-selection and file-path options.
 
 ```
-gralph --prompt-md PROMPT.md --prd-md PRD.md
+gralph --prompt PROMPT.md --prd PRD.md
 ```
 
 Two files drive every loop:
 
 - **PRD.md** — machine-readable checklist of work cycles; gralph reads and advances it
-- **PROMPT.md** — per-iteration procedure telling Claude how to execute exactly one cycle
+- **PROMPT.md** — per-iteration procedure telling the configured coding agent how to execute exactly one cycle
 
 These are NOT traditional documents. PRD.md is a checklist. PROMPT.md is a loop procedure, not a one-shot implementation prompt.
 
@@ -45,7 +45,7 @@ See `templates/PRD-template.md` for the full template.
 7. Risks and Mitigations
 8. Definition of Done
 
-The opening italicized note is required — it orients Claude on how gralph processes the document.
+The opening italicized note is required — it explains how `gralph` processes the document.
 
 ### Cycle Format
 
@@ -81,7 +81,7 @@ Every cycle under `## Implementation Plan` must have all six fields:
 
 ### Purpose
 
-Per-iteration instructions. Claude reads this at the start of every gralph invocation, selects the first unchecked PRD cycle, executes it, verifies, commits, updates the PRD, and stops.
+Per-iteration instructions. The configured coding agent reads this at the start of every `gralph` invocation, selects the first unchecked PRD cycle, executes it, verifies, commits, updates the PRD, and stops.
 
 ### Required Sections
 
@@ -117,4 +117,4 @@ The Non-Negotiable Rules and 8-step procedure structure stay the same across pro
 | Cycles that are too large              | If a cycle takes multiple gralph runs to finish, split it              |
 | No Verify command                      | Every cycle needs a runnable command exiting 0 on success              |
 | Vague agent name                       | Use the exact subagent name registered in the repo                     |
-| Missing progress log path in PROMPT.md | Claude needs to know where to append the progress entry                |
+| Missing progress log path in PROMPT.md | The coding agent needs to know where to append the progress entry      |

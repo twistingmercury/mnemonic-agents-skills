@@ -21,7 +21,7 @@
 
 ---
 
-`/rlm` is a long-context analysis skill backed by a persistent local REPL (`scripts/rlm_repl.py`).
+`rlm` is an agent-agnostic long-context analysis skill backed by a persistent local REPL (`scripts/rlm_repl.py`).
 It supports single-file and recursive directory corpus ingestion for repeated query workflows.
 
 ## Usage
@@ -34,8 +34,8 @@ Invoke the skill with:
 Examples:
 
 ```text
-/rlm context=./docs/observability.md query="Summarize alerting gaps"
-/rlm context=./architecture-docs query="Compare security and communications assumptions"
+context=./docs/observability.md query="Summarize alerting gaps"
+context=./architecture-docs query="Compare security and communications assumptions"
 ```
 
 `query` is required at the skill interface.
@@ -46,7 +46,7 @@ Examples:
 2. Reuse the persisted REPL state for additional queries.
 3. Reset and reload manually when source content changes.
 
-State is persisted at `.claude/rlm_state/state.pkl` by default.
+State is persisted at `.mnemonic/rlm_state/state.pkl` by default.
 
 ## Key Considerations
 

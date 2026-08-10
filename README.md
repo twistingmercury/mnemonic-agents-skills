@@ -64,15 +64,16 @@ See [ABOUT-THE-AGENTS.md](agents/claude/ABOUT-THE-AGENTS.md) for Claude Code wor
 
 Portable skills live under `skills/shared/`; platform-specific skills live under `skills/claude/` or `skills/codex/`. Claude Code installs shared and Claude-specific skills into `~/.claude/skills/`. Codex installs shared and Codex-specific skills into `~/.agents/skills/`.
 
-| Skill            | Purpose                                                   |
-| ---------------- | --------------------------------------------------------- |
-| `arch-docs`      | Create and update architecture documentation              |
-| `code-review`    | Orchestrate parallel code review across multiple concerns |
-| `docker-first-ci`| Implement and harden Docker-first CI/CD pipelines         |
-| `prime`          | Prime Claude's context before complex tasks               |
-| `readme-writer`  | Create or update project READMEs from a standard template |
-| `rlm`            | Run long-context tasks using a persistent Python REPL     |
-| `shell-script`   | Generate shell scripts with automatic BATS test coverage  |
+| Skill                    | Purpose                                                   |
+| ------------------------ | --------------------------------------------------------- |
+| `arch-docs`              | Create and update architecture documentation              |
+| `code-review`            | Orchestrate parallel code review across multiple concerns |
+| `docker-first-ci`        | Implement and harden Docker-first CI/CD pipelines         |
+| `prime`                  | Prime Claude's context before complex tasks               |
+| `ralph-loop-docs-writer` | Create PRD and prompt files for agent-agnostic Ralph loops |
+| `readme-writer`          | Create or update project READMEs from a standard template |
+| `rlm`                    | Run long-context tasks using a persistent Python REPL     |
+| `shell-script`           | Generate shell scripts with automatic BATS test coverage  |
 
 ## How it works
 
