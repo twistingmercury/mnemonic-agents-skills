@@ -1,8 +1,8 @@
 #!/usr/bin/env bats
 
-REPO_ROOT="$(cd "$(dirname "$BATS_TEST_FILENAME")/../../.." && pwd)"
-CLAUDE_AGENT_ROOT="${REPO_ROOT}/agents/claude"
-CODEX_AGENT_ROOT="${REPO_ROOT}/agents/codex"
+REPO_ROOT="$(cd "$(dirname "$BATS_TEST_FILENAME")/../.." && pwd)"
+CLAUDE_AGENT_ROOT="${REPO_ROOT}/claude/agents"
+CODEX_AGENT_ROOT="${REPO_ROOT}/codex/agents"
 
 @test "every Claude agent has a Codex definition" {
     local claude_count

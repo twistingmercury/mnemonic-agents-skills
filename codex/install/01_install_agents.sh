@@ -3,10 +3,9 @@
 set -euo pipefail
 
 SCRIPTS="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-MNEMONIC_INSTALL_ROOT="${MNEMONIC_INSTALL_ROOT:-$(cd "${SCRIPTS}/../.." && pwd)}"
-PROJ_ROOT="${PROJ_ROOT:-$(cd "${MNEMONIC_INSTALL_ROOT}/.." && pwd)}"
+PROJ_ROOT="${PROJ_ROOT:-$(cd "${SCRIPTS}/../.." && pwd)}"
 
-AGENT_SOURCE="${AGENT_SOURCE:-${PROJ_ROOT}/agents/codex}"
+AGENT_SOURCE="${AGENT_SOURCE:-${PROJ_ROOT}/codex/agents}"
 AGENTS_DIR="${AGENTS_DIR:-${CODEX_HOME:-${HOME}/.codex}/agents/}"
 FORCE="${FORCE:-0}"
 

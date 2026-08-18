@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
 
-REPO_ROOT="$(cd "$(dirname "$BATS_TEST_FILENAME")/../../.." && pwd)"
-ARCH_DOCS_ROOT="${REPO_ROOT}/skills/shared/arch-docs"
+REPO_ROOT="$(cd "$(dirname "$BATS_TEST_FILENAME")/../.." && pwd)"
+ARCH_DOCS_ROOT="${REPO_ROOT}/shared/skills/arch-docs"
 
 @test "architecture templates use snake_case names with two-digit versions" {
     run python3 - "${ARCH_DOCS_ROOT}/templates" <<'PY'
@@ -37,17 +37,19 @@ PY
 
     run grep -R -E --include='*.md' --include='*.toml' -- \
         '[0-9]{2}-(overview|requirements|architectural-decisions|system-architecture|communication-patterns|deployment-architecture|security-architecture|observability-architecture|data-architecture)(-v[0-9]{2})?\.md' \
-        "${REPO_ROOT}/agents" "${REPO_ROOT}/skills"
+        "${REPO_ROOT}/claude/agents" "${REPO_ROOT}/codex/agents" \
+        "${REPO_ROOT}/shared/skills"
     [ "$status" -eq 1 ]
 }
 
 @test "generated code-review paths use snake_case" {
     run grep -R -F --include='*.md' -- 'docs/code-reviews/' \
-        "${REPO_ROOT}/agents" "${REPO_ROOT}/skills"
+        "${REPO_ROOT}/claude/agents" "${REPO_ROOT}/codex/agents" \
+        "${REPO_ROOT}/shared/skills"
     [ "$status" -eq 1 ]
 
     run grep -F -- 'docs/code_reviews/phase_09_routing_engine_v01.md' \
-        "${REPO_ROOT}/skills/shared/code-review/SKILL.md"
+        "${REPO_ROOT}/shared/skills/code-review/SKILL.md"
     [ "$status" -eq 0 ]
 }
 
@@ -76,13 +78,13 @@ PY
 
     for agent in "${claude_agents[@]}"; do
         run grep -E -- 'Never edit a published|published and immutable' \
-            "${REPO_ROOT}/agents/claude/${agent}"
+            "${REPO_ROOT}/claude/agents/${agent}"
         [ "$status" -eq 0 ]
     done
 
     for agent in "${codex_agents[@]}"; do
         run grep -E -- 'Never edit a published|published and immutable' \
-            "${REPO_ROOT}/agents/codex/${agent}"
+            "${REPO_ROOT}/codex/agents/${agent}"
         [ "$status" -eq 0 ]
     done
 }
@@ -90,17 +92,17 @@ PY
 @test "documentation-producing skills define published-document behavior" {
     local skill
     local skills=(
-        shared/code-review/SKILL.md
-        shared/ralph-loop-docs-writer/SKILL.md
-        shared/shell-script/SKILL.md
-        shared/arch-docs/SKILL.md
-        shared/docker-first-ci/SKILL.md
-        shared/readme-writer/SKILL.md
+        code-review/SKILL.md
+        ralph-loop-docs-writer/SKILL.md
+        shell-script/SKILL.md
+        arch-docs/SKILL.md
+        docker-first-ci/SKILL.md
+        readme-writer/SKILL.md
     )
 
     for skill in "${skills[@]}"; do
         run grep -E -i -- 'published (architecture )?(document|review|version)|published standalone|published-document preservation|preserve published documentation' \
-            "${REPO_ROOT}/skills/${skill}"
+            "${REPO_ROOT}/shared/skills/${skill}"
         [ "$status" -eq 0 ]
     done
 }

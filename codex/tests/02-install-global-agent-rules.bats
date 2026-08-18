@@ -1,8 +1,8 @@
 #!/usr/bin/env bats
 
-REPO_ROOT="$(cd "$(dirname "$BATS_TEST_FILENAME")/../../.." && pwd)"
-INSTALLER="${REPO_ROOT}/install/codex/scripts/02-install-global-agent-rules.sh"
-GLOBAL_RULES="${REPO_ROOT}/agents/codex/global-agents.md"
+REPO_ROOT="$(cd "$(dirname "$BATS_TEST_FILENAME")/../.." && pwd)"
+INSTALLER="${REPO_ROOT}/codex/install/02_install_global_agents.sh"
+GLOBAL_RULES="${REPO_ROOT}/codex/agents/global-agents.md"
 
 setup() {
     TEST_TMP="$(mktemp -d "${BATS_TEST_TMPDIR}/global-rules.XXXXXX")"
@@ -156,12 +156,16 @@ make_fake_command() {
 @test "stale and broken repo-managed links are replaced" {
     local stale_home="${TEST_TMP}/stale-home"
     local broken_home="${TEST_TMP}/broken-home"
+    local legacy_home="${TEST_TMP}/legacy-home"
     local expected_source
     expected_source="$(cd "$(dirname "${GLOBAL_AGENTS_SOURCE}")" && pwd -P)/$(basename "${GLOBAL_AGENTS_SOURCE}")"
-    mkdir -p "${stale_home}" "${broken_home}" "${TEST_TMP}/old/agents/codex"
-    printf 'old rules\n' > "${TEST_TMP}/old/agents/codex/global-agents.md"
-    ln -s "${TEST_TMP}/old/agents/codex/global-agents.md" "${stale_home}/AGENTS.md"
-    ln -s "${TEST_TMP}/missing/agents/codex/global-agents.md" "${broken_home}/AGENTS.md"
+    mkdir -p "${stale_home}" "${broken_home}" "${legacy_home}" \
+        "${TEST_TMP}/old/codex/agents" "${TEST_TMP}/old/agents/codex"
+    printf 'old rules\n' > "${TEST_TMP}/old/codex/agents/global-agents.md"
+    printf 'legacy rules\n' > "${TEST_TMP}/old/agents/codex/global-agents.md"
+    ln -s "${TEST_TMP}/old/codex/agents/global-agents.md" "${stale_home}/AGENTS.md"
+    ln -s "${TEST_TMP}/missing/codex/agents/global-agents.md" "${broken_home}/AGENTS.md"
+    ln -s "${TEST_TMP}/old/agents/codex/global-agents.md" "${legacy_home}/AGENTS.md"
 
     run env CODEX_HOME="${stale_home}" \
         GLOBAL_AGENTS_SOURCE="${GLOBAL_AGENTS_SOURCE}" "${INSTALLER}"
@@ -172,6 +176,11 @@ make_fake_command() {
         GLOBAL_AGENTS_SOURCE="${GLOBAL_AGENTS_SOURCE}" "${INSTALLER}"
     [ "$status" -eq 0 ]
     [ "$(readlink "${broken_home}/AGENTS.md")" = "${expected_source}" ]
+
+    run env CODEX_HOME="${legacy_home}" \
+        GLOBAL_AGENTS_SOURCE="${GLOBAL_AGENTS_SOURCE}" "${INSTALLER}"
+    [ "$status" -eq 0 ]
+    [ "$(readlink "${legacy_home}/AGENTS.md")" = "${expected_source}" ]
 }
 
 @test "regular file is preserved for FORCE=0 and FORCE=1" {
@@ -283,7 +292,7 @@ make_fake_command() {
     local fake_bin
     fake_bin="$(make_fake_command rm 73)"
     mkdir -p "${CODEX_HOME}"
-    ln -s "${TEST_TMP}/old/agents/codex/global-agents.md" "${CODEX_HOME}/AGENTS.md"
+    ln -s "${TEST_TMP}/old/codex/agents/global-agents.md" "${CODEX_HOME}/AGENTS.md"
 
     run env PATH="${fake_bin}:${PATH}" "${INSTALLER}"
 
@@ -324,7 +333,7 @@ make_fake_command() {
 
     # The awk field and sed capture references are intentionally literal.
     # shellcheck disable=SC2016
-    find "${REPO_ROOT}/agents/codex" -type f -name '*.toml' -print0 |
+    find "${REPO_ROOT}/codex/agents" -type f -name '*.toml' -print0 |
         xargs -0 awk -F '"' '/^[[:space:]]*name[[:space:]]*=[[:space:]]*"/ { print $2 }' |
         sort > "${toml_names}"
     # shellcheck disable=SC2016

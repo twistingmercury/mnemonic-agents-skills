@@ -7,11 +7,9 @@ setup() {
     export SKILL_SOURCE="${TEST_TMP}/skills"
     export SKILLS_DIR="${TEST_TMP}/target/"
     export FORCE=0
-    export PROJ_ROOT="${TEST_TMP}"
-
-    # shellcheck source=../scripts/03-install-skills.sh disable=SC1091
+    # shellcheck source=../install/03_install_skills.sh disable=SC1091
     # Entry point guard prevents install_skills from running on source
-    source "${SCRIPT_DIR}/scripts/03-install-skills.sh"
+    source "${SCRIPT_DIR}/install/03_install_skills.sh"
 }
 
 teardown() {

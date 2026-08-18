@@ -3,13 +3,12 @@
 set -euo pipefail
 
 SCRIPTS="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-MNEMONIC_INSTALL_ROOT="${MNEMONIC_INSTALL_ROOT:-$(cd "${SCRIPTS}/../.." && pwd)}"
-PROJ_ROOT="${PROJ_ROOT:-$(cd "${MNEMONIC_INSTALL_ROOT}/.." && pwd)}"
+PROJ_ROOT="${PROJ_ROOT:-$(cd "${SCRIPTS}/../.." && pwd)}"
 
 SKILL_SOURCE="${SKILL_SOURCE:-}"
-SHARED_SKILL_SOURCE="${SHARED_SKILL_SOURCE:-${PROJ_ROOT}/skills/shared}"
-PLATFORM_SKILL_SOURCE="${PLATFORM_SKILL_SOURCE:-${PROJ_ROOT}/skills/claude}"
-SKILLS_DIR="${SKILLS_DIR:-${HOME}/.claude/skills/}"
+SHARED_SKILL_SOURCE="${SHARED_SKILL_SOURCE:-${PROJ_ROOT}/shared/skills}"
+PLATFORM_SKILL_SOURCE="${PLATFORM_SKILL_SOURCE:-${PROJ_ROOT}/codex/skills}"
+SKILLS_DIR="${SKILLS_DIR:-${CODEX_HOME:-${HOME}/.codex}/skills/}"
 FORCE="${FORCE:-0}"
 
 skill_source_dirs() {

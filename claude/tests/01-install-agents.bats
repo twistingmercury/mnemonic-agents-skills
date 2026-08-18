@@ -7,11 +7,9 @@ setup() {
     export AGENT_SOURCE="${TEST_TMP}/agents"
     export AGENTS_DIR="${TEST_TMP}/target/"
     export FORCE=0
-    export PROJ_ROOT="${TEST_TMP}"
-
-    # shellcheck source=../scripts/01-install-agents.sh disable=SC1091
+    # shellcheck source=../install/01_install_agents.sh disable=SC1091
     # Entry point guard prevents install_agents from running on source
-    source "${SCRIPT_DIR}/scripts/01-install-agents.sh"
+    source "${SCRIPT_DIR}/install/01_install_agents.sh"
 }
 
 teardown() {

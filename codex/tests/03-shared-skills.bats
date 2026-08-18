@@ -1,15 +1,17 @@
 #!/usr/bin/env bats
 
-REPO_ROOT="$(cd "$(dirname "$BATS_TEST_FILENAME")/../../.." && pwd)"
-SHARED_SKILLS_ROOT="${REPO_ROOT}/skills/shared"
+REPO_ROOT="$(cd "$(dirname "$BATS_TEST_FILENAME")/../.." && pwd)"
+SHARED_SKILLS_ROOT="${REPO_ROOT}/shared/skills"
 
 @test "Codex skills use the configured Codex home" {
     local codex_home="${BATS_TEST_TMPDIR}/codex-home"
 
+    # Variables expand in the child shell.
+    # shellcheck disable=SC2016
     run env REPO_ROOT="${REPO_ROOT}" CODEX_HOME="${codex_home}" bash -c '
         set -euo pipefail
         unset SKILLS_DIR
-        source "${REPO_ROOT}/install/codex/scripts/03-install-skills.sh"
+        source "${REPO_ROOT}/codex/install/03_install_skills.sh"
         printf "%s\n" "${SKILLS_DIR}"
     '
 
@@ -20,10 +22,12 @@ SHARED_SKILLS_ROOT="${REPO_ROOT}/skills/shared"
 @test "Codex skills default to the .codex directory under HOME" {
     local test_home="${BATS_TEST_TMPDIR}/home"
 
+    # Variables expand in the child shell.
+    # shellcheck disable=SC2016
     run env -u CODEX_HOME REPO_ROOT="${REPO_ROOT}" HOME="${test_home}" bash -c '
         set -euo pipefail
         unset SKILLS_DIR
-        source "${REPO_ROOT}/install/codex/scripts/03-install-skills.sh"
+        source "${REPO_ROOT}/codex/install/03_install_skills.sh"
         printf "%s\n" "${SKILLS_DIR}"
     '
 
@@ -36,12 +40,14 @@ SHARED_SKILLS_ROOT="${REPO_ROOT}/skills/shared"
     mkdir -p "${skills_dir}"
     ln -s "${BATS_TEST_TMPDIR}/old-skills/prime" "${skills_dir}/prime"
 
+    # Variables expand in the child shell.
+    # shellcheck disable=SC2016
     run env REPO_ROOT="${REPO_ROOT}" SKILLS_DIR="${skills_dir}/" bash -c '
         set -euo pipefail
         PROJ_ROOT="${REPO_ROOT}"
-        PLATFORM_SKILL_SOURCE="${REPO_ROOT}/skills/codex"
-        SHARED_SKILL_SOURCE="${REPO_ROOT}/skills/shared"
-        source "${REPO_ROOT}/install/codex/scripts/03-install-skills.sh"
+        PLATFORM_SKILL_SOURCE="${REPO_ROOT}/codex/skills"
+        SHARED_SKILL_SOURCE="${REPO_ROOT}/shared/skills"
+        source "${REPO_ROOT}/codex/install/03_install_skills.sh"
         install_skills
         test -L "${SKILLS_DIR}/prime"
         test "$(readlink "${SKILLS_DIR}/prime")" = "${SHARED_SKILL_SOURCE}/prime"
@@ -79,10 +85,10 @@ PY
     [ -f "${SHARED_SKILLS_ROOT}/rlm/SKILL.md" ]
     [ -f "${SHARED_SKILLS_ROOT}/ralph-loop-docs-writer/SKILL.md" ]
     [ -f "${SHARED_SKILLS_ROOT}/shell-script/SKILL.md" ]
-    [ ! -e "${REPO_ROOT}/skills/claude/code-review" ]
-    [ ! -e "${REPO_ROOT}/skills/claude/rlm" ]
-    [ ! -e "${REPO_ROOT}/skills/claude/ralph-loop-docs-writer" ]
-    [ ! -e "${REPO_ROOT}/skills/claude/shell-script" ]
+    [ ! -e "${REPO_ROOT}/claude/skills/code-review" ]
+    [ ! -e "${REPO_ROOT}/claude/skills/rlm" ]
+    [ ! -e "${REPO_ROOT}/claude/skills/ralph-loop-docs-writer" ]
+    [ ! -e "${REPO_ROOT}/claude/skills/shell-script" ]
 }
 
 @test "converted shared skill instructions are agent-agnostic" {
@@ -113,9 +119,9 @@ PY
     run env REPO_ROOT="${REPO_ROOT}" bash -c '
         set -euo pipefail
         PROJ_ROOT="${REPO_ROOT}"
-        PLATFORM_SKILL_SOURCE="${REPO_ROOT}/skills/claude"
-        SHARED_SKILL_SOURCE="${REPO_ROOT}/skills/shared"
-        source "${REPO_ROOT}/install/claude/scripts/03-install-skills.sh"
+        PLATFORM_SKILL_SOURCE="${REPO_ROOT}/claude/skills"
+        SHARED_SKILL_SOURCE="${REPO_ROOT}/shared/skills"
+        source "${REPO_ROOT}/claude/install/03_install_skills.sh"
         list_repo_skills
     '
     [ "$status" -eq 0 ]
@@ -129,9 +135,9 @@ PY
     run env REPO_ROOT="${REPO_ROOT}" bash -c '
         set -euo pipefail
         PROJ_ROOT="${REPO_ROOT}"
-        PLATFORM_SKILL_SOURCE="${REPO_ROOT}/skills/codex"
-        SHARED_SKILL_SOURCE="${REPO_ROOT}/skills/shared"
-        source "${REPO_ROOT}/install/codex/scripts/03-install-skills.sh"
+        PLATFORM_SKILL_SOURCE="${REPO_ROOT}/codex/skills"
+        SHARED_SKILL_SOURCE="${REPO_ROOT}/shared/skills"
+        source "${REPO_ROOT}/codex/install/03_install_skills.sh"
         list_repo_skills
     '
     [ "$status" -eq 0 ]

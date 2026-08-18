@@ -3,8 +3,7 @@
 set -euo pipefail
 
 SCRIPTS="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-MNEMONIC_INSTALL_ROOT="${MNEMONIC_INSTALL_ROOT:-$(cd "${SCRIPTS}/../.." && pwd)}"
-PROJ_ROOT="${PROJ_ROOT:-$(cd "${MNEMONIC_INSTALL_ROOT}/.." && pwd)}"
+PROJ_ROOT="${PROJ_ROOT:-$(cd "${SCRIPTS}/../.." && pwd)}"
 TIMESTAMP="${TIMESTAMP:-$(date +%Y%m%d-%H%M%S)}"
 
 restore_backup_on_failure() {
@@ -19,10 +18,10 @@ restore_backup_on_failure() {
 CLAUDE_ROOT="${CLAUDE_ROOT:-${HOME}/.claude}"
 FORCE="${FORCE:-0}"
 GLOBAL_CONF="${CLAUDE_ROOT}/CLAUDE.md"
-AGENT_RULES_SOURCE="${AGENT_RULES_SOURCE:-${PROJ_ROOT}/agents/claude/global-agent-rules.md}"
+AGENT_RULES_SOURCE="${AGENT_RULES_SOURCE:-${PROJ_ROOT}/claude/agents/GLOBAL_AGENT_RULES.md}"
 
-# shellcheck source=../lib/print.sh disable=SC1091
-. "${MNEMONIC_INSTALL_ROOT}/lib/print.sh"
+# shellcheck source=../../lib/print.sh disable=SC1091
+. "${PROJ_ROOT}/lib/print.sh"
 
 ## Not every Claude Code install may have a global Claude.md file.
 ## So when that situation is encountered, we'll need to create it for the user.

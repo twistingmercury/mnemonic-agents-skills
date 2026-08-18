@@ -8,13 +8,11 @@ setup() {
     export AGENT_RULES_SOURCE="${TEST_TMP}/global-agent-rules.md"
     export FORCE=0
     export TIMESTAMP="test"
-    export PROJ_ROOT="${TEST_TMP}"
-
     mkdir -p "${CLAUDE_ROOT}"
 
-    # shellcheck source=../scripts/02-install-global-agent-rules.sh disable=SC1091
+    # shellcheck source=../install/02_install_global_agents.sh disable=SC1091
     # Entry point guard prevents install_global_agent_rules from running on source
-    source "${SCRIPT_DIR}/scripts/02-install-global-agent-rules.sh"
+    source "${SCRIPT_DIR}/install/02_install_global_agents.sh"
 
     # GLOBAL_CONF is derived from CLAUDE_ROOT by the script after sourcing
     # It resolves to "${CLAUDE_ROOT}/CLAUDE.md"

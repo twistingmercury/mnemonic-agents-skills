@@ -3,13 +3,12 @@
 set -euo pipefail
 
 SCRIPTS="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-MNEMONIC_INSTALL_ROOT="${MNEMONIC_INSTALL_ROOT:-$(cd "${SCRIPTS}/../.." && pwd)}"
-PROJ_ROOT="${PROJ_ROOT:-$(cd "${MNEMONIC_INSTALL_ROOT}/.." && pwd)}"
+PROJ_ROOT="${PROJ_ROOT:-$(cd "${SCRIPTS}/../.." && pwd)}"
 
-# shellcheck source=../lib/print.sh disable=SC1091
-. "${MNEMONIC_INSTALL_ROOT}/lib/print.sh"
+# shellcheck source=../../lib/print.sh disable=SC1091
+. "${PROJ_ROOT}/lib/print.sh"
 
-AGENT_SOURCE="${AGENT_SOURCE:-${PROJ_ROOT}/agents/claude}"
+AGENT_SOURCE="${AGENT_SOURCE:-${PROJ_ROOT}/claude/agents}"
 AGENTS_DIR="${AGENTS_DIR:-${HOME}/.claude/agents/}"
 FORCE="${FORCE:-0}"
 

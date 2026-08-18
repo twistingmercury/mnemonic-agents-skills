@@ -1,8 +1,8 @@
 #!/usr/bin/env bats
 
-REPO_ROOT="$(cd "$(dirname "$BATS_TEST_FILENAME")/../../.." && pwd)"
-AGENT_INSTALLER="${REPO_ROOT}/install/codex/scripts/01-install-agents.sh"
-CODEX_INSTALLER="${REPO_ROOT}/install/codex/scripts/install.sh"
+REPO_ROOT="$(cd "$(dirname "$BATS_TEST_FILENAME")/../.." && pwd)"
+AGENT_INSTALLER="${REPO_ROOT}/codex/install/01_install_agents.sh"
+CODEX_INSTALLER="${REPO_ROOT}/codex/install/install.sh"
 
 setup() {
     TEST_TMP="$(mktemp -d)"
@@ -227,11 +227,11 @@ make_agent() {
 
 make_entrypoint_fixture() {
     local fixture_root="${TEST_TMP}/entrypoint"
-    local fixture_scripts="${fixture_root}/install/codex/scripts"
+    local fixture_scripts="${fixture_root}/codex/install"
 
-    mkdir -p "${fixture_scripts}" "${fixture_root}/install/lib"
+    mkdir -p "${fixture_scripts}" "${fixture_root}/lib"
     cp "${CODEX_INSTALLER}" "${fixture_scripts}/install.sh"
-    cp "${REPO_ROOT}/install/lib/print.sh" "${fixture_root}/install/lib/print.sh"
+    cp "${REPO_ROOT}/lib/print.sh" "${fixture_root}/lib/print.sh"
 
     # Variables expand when the generated phase stub runs.
     # shellcheck disable=SC2016
@@ -239,21 +239,21 @@ make_entrypoint_fixture() {
         '#!/usr/bin/env bash' \
         'printf "agents\\n" >> "${PHASE_LOG}"' \
         'exit "${AGENT_PHASE_EXIT:-0}"' \
-        > "${fixture_scripts}/01-install-agents.sh"
+        > "${fixture_scripts}/01_install_agents.sh"
     # Variables expand when the generated phase stub runs.
     # shellcheck disable=SC2016
     printf '%s\n' \
         '#!/usr/bin/env bash' \
         'printf "global-rules\\n" >> "${PHASE_LOG}"' \
         'exit "${GLOBAL_RULES_PHASE_EXIT:-0}"' \
-        > "${fixture_scripts}/02-install-global-agent-rules.sh"
+        > "${fixture_scripts}/02_install_global_agents.sh"
     # Variables expand when the generated phase stub runs.
     # shellcheck disable=SC2016
     printf '%s\n' \
         '#!/usr/bin/env bash' \
         'printf "skills\\n" >> "${PHASE_LOG}"' \
         'exit "${SKILL_PHASE_EXIT:-0}"' \
-        > "${fixture_scripts}/03-install-skills.sh"
+        > "${fixture_scripts}/03_install_skills.sh"
     chmod +x "${fixture_scripts}"/*.sh
 
     ENTRYPOINT_FIXTURE="${fixture_scripts}/install.sh"

@@ -3,16 +3,15 @@
 set -euo pipefail
 
 SCRIPTS="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-MNEMONIC_INSTALL_ROOT="${MNEMONIC_INSTALL_ROOT:-$(cd "${SCRIPTS}/../.." && pwd)}"
-PROJ_ROOT="${PROJ_ROOT:-$(cd "${MNEMONIC_INSTALL_ROOT}/.." && pwd)}"
+PROJ_ROOT="${PROJ_ROOT:-$(cd "${SCRIPTS}/../.." && pwd)}"
 
-GLOBAL_AGENTS_SOURCE="${GLOBAL_AGENTS_SOURCE:-${PROJ_ROOT}/agents/codex/global-agents.md}"
+GLOBAL_AGENTS_SOURCE="${GLOBAL_AGENTS_SOURCE:-${PROJ_ROOT}/codex/agents/global-agents.md}"
 CODEX_HOME="${CODEX_HOME:-${HOME}/.codex}"
 GLOBAL_AGENTS_TARGET="${CODEX_HOME}/AGENTS.md"
 FORCE="${FORCE:-0}"
 
-# shellcheck source=../lib/print.sh disable=SC1091
-. "${MNEMONIC_INSTALL_ROOT}/lib/print.sh"
+# shellcheck source=../../lib/print.sh disable=SC1091
+. "${PROJ_ROOT}/lib/print.sh"
 
 is_unsafe_codex_home() {
     local resolved_home
@@ -80,6 +79,7 @@ is_repo_managed_link() {
     fi
 
     case "${link_target}" in
+        */codex/agents/global-agents.md | \
         */agents/codex/global-agents.md)
             return 0
             ;;

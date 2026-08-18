@@ -25,7 +25,7 @@ Request a specific agent by name or describe the work and let the configured cli
 
 The platform installers make the corresponding agent catalog available automatically. Claude Code uses Markdown definitions; Codex uses native TOML definitions.
 
-The catalog below uses Claude Code display names, which contain spaces; installed Claude definition filenames use hyphens. Codex identifiers use underscores instead (for example, `go_software_engineer`), and the exact TOML `name` values in the [Codex registry](agents/codex/global-agents.md#custom-agent-registry) are authoritative.
+The catalog below uses Claude Code display names, which contain spaces; installed Claude definition filenames use hyphens. Codex identifiers use underscores instead (for example, `go_software_engineer`), and the exact TOML `name` values in the [Codex registry](codex/agents/global-agents.md#custom-agent-registry) are authoritative.
 
 ```text
 User: "Build a user management REST API in Go"
@@ -62,11 +62,11 @@ User: "Review this Go diff for correctness risks"
 | Documentation and review | `technical writer`, `code reviewer`                                                                                                                 |
 | Support                  | `rlm subcall agent`                                                                                                                                 |
 
-See [ABOUT-THE-AGENTS.md](agents/claude/ABOUT-THE-AGENTS.md) for Claude Code workflow examples and role boundaries. See [Codex Agents](agents/codex/README.md) for the native Codex definition format and conventions.
+See [ABOUT-THE-AGENTS.md](claude/agents/ABOUT-THE-AGENTS.md) for Claude Code workflow examples and role boundaries. See [Codex Agents](codex/agents/README.md) for the native Codex definition format and conventions.
 
 ### Skill catalog
 
-Portable skills live under `skills/shared/`; platform-specific skills live under `skills/claude/` or `skills/codex/`. Claude Code installs shared and Claude-specific skills into `~/.claude/skills/`. Codex installs shared and Codex-specific skills into `$CODEX_HOME/skills/`, defaulting to `~/.codex/skills/`.
+Portable skills live under `shared/skills/`. Each platform installer can also include an optional platform-specific `skills/` directory when one exists. Claude Code installs skills into `~/.claude/skills/`; Codex installs them into `$CODEX_HOME/skills/`, defaulting to `~/.codex/skills/`.
 
 | Skill                    | Purpose                                                    |
 | ------------------------ | ---------------------------------------------------------- |
@@ -83,9 +83,9 @@ Portable skills live under `skills/shared/`; platform-specific skills live under
 
 This repository contains three integration layers:
 
-- Platform-specific agent definitions under `agents/claude/` and `agents/codex/`
-- Platform-specific global delegation guidance under `agents/claude/` and `agents/codex/`
-- Portable skills under `skills/shared/`, with optional platform-specific skill directories
+- Claude integration files under `claude/`, including agents, installers, and tests
+- Codex integration files under `codex/`, including agents, installers, and tests
+- Portable skills under `shared/skills/` and shared shell helpers under `lib/`
 
 Installers are separated by platform:
 
@@ -100,9 +100,9 @@ Both skill installers combine the shared skill directory with an optional platfo
 
 **This is a reference implementation, not a framework.** Adapt the agent prompts and delegation model to match your own workflow.
 
-**Global rules are part of both platform installs.** The Claude installer updates a managed block in `~/.claude/CLAUDE.md`. The Codex installer links `$CODEX_HOME/AGENTS.md` to `agents/codex/global-agents.md`, which defines global coordination behavior and the custom-agent routing registry. A nonempty `$CODEX_HOME/AGENTS.override.md` suppresses `$CODEX_HOME/AGENTS.md`; restarting Codex does not activate the installed rules until the override is removed or emptied. Review the relevant source before installing if you maintain custom global instructions.
+**Global rules are part of both platform installs.** The Claude installer updates a managed block in `~/.claude/CLAUDE.md`. The Codex installer links `$CODEX_HOME/AGENTS.md` to `codex/agents/global-agents.md`, which defines global coordination behavior and the custom-agent routing registry. A nonempty `$CODEX_HOME/AGENTS.override.md` suppresses `$CODEX_HOME/AGENTS.md`; restarting Codex does not activate the installed rules until the override is removed or emptied. Review the relevant source before installing if you maintain custom global instructions.
 
-**Review name conflicts before installing.** Agent and skill entries are classified by repository basename, so same-named paths can be removed and replaced even when they are not symlinks. The Claude agent installer also removes broken `.md` symlinks. For Codex global rules, a non-symlink `$CODEX_HOME/AGENTS.md` is preserved; an unrelated symlink is preserved by default but replaced when `FORCE=1`. See [install details](install/README.md) for complete preservation and replacement behavior.
+**Review name conflicts before installing.** Agent and skill entries are classified by repository basename, so same-named paths can be removed and replaced even when they are not symlinks. The Claude agent installer also removes broken `.md` symlinks. For Codex global rules, a non-symlink `$CODEX_HOME/AGENTS.md` is preserved; an unrelated symlink is preserved by default but replaced when `FORCE=1`. See [installation details](INSTALL.md) for complete preservation and replacement behavior.
 
 **Agents, skills, and Codex global rules use symlinks.** Claude global rules are copied into a managed block instead. Keep the repository checkout available after installation; moving it makes symlinked content stale, so rerun the appropriate installer from the new location to repair it.
 
@@ -121,56 +121,56 @@ Both skill installers combine the shared skill directory with an optional platfo
 
 2. Restart the target client so it reloads installed agents, rules, and skills.
 
-3. Review [ABOUT-THE-AGENTS.md](agents/claude/ABOUT-THE-AGENTS.md) before changing Claude Code delegation behavior, or [global-agents.md](agents/codex/global-agents.md) before changing Codex coordination and routing.
+3. Review [ABOUT-THE-AGENTS.md](claude/agents/ABOUT-THE-AGENTS.md) before changing Claude Code delegation behavior, or [global-agents.md](codex/agents/global-agents.md) before changing Codex coordination and routing.
 
 ### Building & running
 
-The Claude installer at [install.sh](install/claude/scripts/install.sh) runs these scripts in sequence:
+The Claude installer at [install.sh](claude/install/install.sh) runs these scripts in sequence:
 
-| Script                             | Purpose                                                                                     |
-| ---------------------------------- | ------------------------------------------------------------------------------------------- |
-| `01-install-agents.sh`             | Symlink repo-managed agents into `~/.claude/agents/`                                        |
-| `02-install-global-agent-rules.sh` | Update the managed agent rules block in `~/.claude/CLAUDE.md`                               |
-| `03-install-skills.sh`             | Install skill bundles into `~/.claude/skills/`                                              |
+| Script | Purpose |
+| --- | --- |
+| `01_install_agents.sh` | Symlink repo-managed agents into `~/.claude/agents/` |
+| `02_install_global_agents.sh` | Update the managed agent rules block in `~/.claude/CLAUDE.md` |
+| `03_install_skills.sh` | Install skill bundles into `~/.claude/skills/` |
 
 You can also run the scripts individually:
 
 ```bash
-./install/claude/scripts/01-install-agents.sh
-./install/claude/scripts/02-install-global-agent-rules.sh
-./install/claude/scripts/03-install-skills.sh
+./claude/install/01_install_agents.sh
+./claude/install/02_install_global_agents.sh
+./claude/install/03_install_skills.sh
 ```
 
 To force reinstall even when dates are current:
 
 ```bash
-FORCE=1 ./install/claude/scripts/install.sh
+FORCE=1 ./claude/install/install.sh
 ```
 
 The Codex installer runs these phases in order:
 
-| Script                             | Purpose                                                                    |
-| ---------------------------------- | -------------------------------------------------------------------------- |
-| `01-install-agents.sh`             | Flatten and link native TOML agents into `$CODEX_HOME/agents/`             |
-| `02-install-global-agent-rules.sh` | Link `agents/codex/global-agents.md` as `$CODEX_HOME/AGENTS.md`            |
-| `03-install-skills.sh`             | Install shared and Codex-specific skills into `$CODEX_HOME/skills/`        |
+| Script | Purpose |
+| --- | --- |
+| `01_install_agents.sh` | Flatten and link native TOML agents into `$CODEX_HOME/agents/` |
+| `02_install_global_agents.sh` | Link `codex/agents/global-agents.md` as `$CODEX_HOME/AGENTS.md` |
+| `03_install_skills.sh` | Install shared and Codex-specific skills into `$CODEX_HOME/skills/` |
 
 `CODEX_HOME` defaults to `~/.codex`. The installer supports the same `FORCE=1` override:
 
 ```bash
-./install/codex/scripts/install.sh
-FORCE=1 ./install/codex/scripts/install.sh
+./codex/install/install.sh
+FORCE=1 ./codex/install/install.sh
 ```
 
 The phases can also be run individually:
 
 ```bash
-./install/codex/scripts/01-install-agents.sh
-./install/codex/scripts/02-install-global-agent-rules.sh
-./install/codex/scripts/03-install-skills.sh
+./codex/install/01_install_agents.sh
+./codex/install/02_install_global_agents.sh
+./codex/install/03_install_skills.sh
 ```
 
-See [install/README.md](install/README.md) for install details and behavior.
+See [INSTALL.md](INSTALL.md) for install details and behavior.
 
 ### Testing
 
@@ -185,13 +185,13 @@ Run one platform suite with `make test-claude` or `make test-codex`.
 Run the RLM unit tests directly:
 
 ```bash
-(cd skills/shared/rlm && python3 -m unittest discover -s tests -v)
+(cd shared/skills/rlm && python3 -m unittest discover -s tests -v)
 ```
 
 Validate the shell scripts with ShellCheck:
 
 ```bash
-shellcheck install/claude/scripts/*.sh install/codex/scripts/*.sh
+shellcheck claude/install/*.sh codex/install/*.sh
 ```
 
 If you use markdownlint in your environment, run it against edited docs after documentation changes.

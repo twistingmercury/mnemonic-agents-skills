@@ -8,20 +8,20 @@ help: ## Show this help
 install: install-claude ## Install the Claude Code integration (default).
 
 install-claude: ## Install Claude Code agents, global rules, and skills.
-	./install/claude/scripts/install.sh
+	./claude/install/install.sh
 
 install-codex: ## Install Codex agents, global rules, and shared/Codex-specific skills.
-	./install/codex/scripts/install.sh
+	./codex/install/install.sh
 
 install-all: install-claude install-codex ## Install both platform integrations.
 
 test: test-claude test-codex ## Run all available unit tests.
 
 test-claude: ## Run Claude Code installer tests (requires bats on PATH).
-	bats install/claude/tests/
+	bats claude/tests/
 
 test-codex: ## Validate native Codex agent definitions (requires bats and Python 3.11+).
-	bats install/codex/tests/
+	bats codex/tests/
 
 upload: ## Upload agent definitions to the Mnemonic API (upsert).
 	./setup/scripts/03-upload-agents.sh
