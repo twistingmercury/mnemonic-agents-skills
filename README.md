@@ -16,6 +16,7 @@ Specialized development agents and skills for AI-assisted software work in Claud
 - [Key Considerations](#key-considerations)
 - [Development Considerations](#development-considerations)
 - [Versioning](#versioning)
+- [Versioning](#versioning)
 
 ## Usage
 
@@ -40,20 +41,7 @@ Claude Code:
 
 For narrow tasks, Claude Code can delegate directly:
 
-```text
-User: "Write BATS tests for scripts/backup.sh"
-  -> Main Claude delegates to bats test engineer
-
-User: "Update the project README"
-  -> Main Claude delegates to technical writer
-
-User: "Review this Go diff for correctness risks"
-  -> Main Claude delegates to code reviewer
-```
-
-### Agent catalog
-
-| Area                     | Agents                                                                                                                                              |
+| Area                     | Roles                                                                                                                                               |
 | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Architecture             | `solutions architect`, `go software architect`, `api architect`, `data architect`                                                                   |
 | Implementation           | `go software engineer`, `python software engineer`, `dotnet software engineer`, `react software engineer`, `shell script engineer`, `data engineer` |
@@ -98,7 +86,8 @@ Both skill installers combine the shared skill directory with an optional platfo
 
 ## Key Considerations
 
-**This is a reference implementation, not a framework.** Adapt the agent prompts and delegation model to match your own workflow.
+This is a reference implementation, not a framework. Adapt prompts and routing
+rules to the needs of each project.
 
 **Global rules are part of both platform installs.** The Claude installer updates a managed block in `~/.claude/CLAUDE.md`. The Codex installer links `$CODEX_HOME/AGENTS.md` to `codex/agents/global-agents.md`, which defines global coordination behavior and the custom-agent routing registry. A nonempty `$CODEX_HOME/AGENTS.override.md` suppresses `$CODEX_HOME/AGENTS.md`; restarting Codex does not activate the installed rules until the override is removed or emptied. Review the relevant source before installing if you maintain custom global instructions.
 
@@ -194,13 +183,11 @@ Validate the shell scripts with ShellCheck:
 shellcheck claude/install/*.sh codex/install/*.sh
 ```
 
-If you use markdownlint in your environment, run it against edited docs after documentation changes.
-
 ### Versioning
 
 This project follows [Semantic Versioning 2.0.0](https://semver.org/).
 
-Version is determined from git tags:
+Version is determined from Git tags:
 
 ```bash
 git describe --tags --always
