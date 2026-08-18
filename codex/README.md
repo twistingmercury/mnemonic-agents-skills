@@ -29,6 +29,13 @@ precedence over the global registry.
 
 ## Installation
 
+### Prerequisites
+
+- Codex is installed.
+- Bash 4 or newer is available.
+- The configured `CODEX_HOME` location, or its parent when it does not yet
+  exist, is writable.
+
 `CODEX_HOME` controls the destination and defaults to `~/.codex`. From the
 repository root, run either the Make target or direct entrypoint:
 
@@ -58,14 +65,43 @@ Set `FORCE=1` to refresh repository-managed links:
 FORCE=1 ./codex/install/install.sh
 ```
 
-Codex agent installation preserves non-symlink targets, including colliding
-basenames. Global-rule installation also preserves non-symlink targets;
-`FORCE=1` may replace an unrelated `AGENTS.md` symlink. Skill paths with names
-managed by this repository may be replaced. See the
-[complete installation behavior](../INSTALL.md) before installing over custom
-content.
+### Preservation behavior
+
+- Agent paths that are not symlinks are preserved, including paths whose
+  basenames collide with repository-managed agents. This remains true with
+  `FORCE=1`.
+- An existing non-symlink `$CODEX_HOME/AGENTS.md` is preserved, including with
+  `FORCE=1`. An unrelated symlink is preserved by default but may be replaced
+  with `FORCE=1`.
+- Agent and skill names not managed by this repository are preserved. Skill
+  paths whose names collide with repository-managed skills may be replaced.
+- Repository-managed stale or broken links are repaired. The global-rules
+  phase also recognizes links from the repository's legacy layout.
 
 Restart Codex after installation so it reloads agents, rules, and skills.
+
+## Troubleshooting
+
+### Agents, rules, or skills do not appear
+
+Rerun the installer and restart Codex. Installed content uses symlinks, so
+moving the checkout makes those links stale. Rerunning the installer from the
+checkout's new location repairs repository-managed links.
+
+### Global rules were not linked
+
+The installer preserves an existing non-symlink `$CODEX_HOME/AGENTS.md`. Move
+that path out of the way only if you intend this repository to own the complete
+file, then rerun:
+
+```bash
+./codex/install/02_install_global_agents.sh
+```
+
+Also check the override precedence described in
+[Global registry and precedence](#global-registry-and-precedence). Empty or
+remove the override only if you want the installed global registry to become
+active.
 
 ## Testing
 
@@ -80,5 +116,3 @@ Validate installer shell scripts separately with:
 ```bash
 shellcheck codex/install/*.sh
 ```
-
-For troubleshooting and preservation details, see [Installation](../INSTALL.md).
