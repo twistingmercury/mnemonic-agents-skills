@@ -43,16 +43,18 @@ Narrow requests can go directly to one specialist:
 ## Global rules
 
 [`GLOBAL_AGENT_RULES.md`](agents/GLOBAL_AGENT_RULES.md) is the source for the
-managed agent-rules block in the user's global `CLAUDE.md`. The installer:
-
-- creates `~/.claude/CLAUDE.md` when it does not exist;
-- replaces only content between the managed rule markers;
-- backs up an existing file before changing that block; and
-- compares the embedded `Last Updated` date before reinstalling.
-
-Content outside the managed markers remains user-owned.
+managed agent-rules block in the user's global `CLAUDE.md`. The installer uses
+the embedded `Last Updated` date to avoid unnecessary rewrites unless
+`FORCE=1` is set.
 
 ## Installation
+
+### Prerequisites
+
+- Claude Code is installed.
+- Bash 4 or newer is available.
+- The home directory is writable. The full installer creates `~/.claude` as
+  needed; the standalone global-rules phase expects it to exist already.
 
 From the repository root, run either the Make target or direct entrypoint:
 
@@ -83,12 +85,40 @@ managed rules block even when its date is current:
 FORCE=1 ./claude/install/install.sh
 ```
 
-Unrelated agent and skill names are preserved. Paths whose basenames collide
-with repository-managed agents or skills may be replaced; review the
-[complete installation behavior](../INSTALL.md) before installing over a
-custom catalog.
+### Preservation behavior
+
+- Agent and skill names not managed by this repository are preserved.
+- Agent or skill paths whose basenames collide with repository-managed content
+  may be replaced. Back up custom content with a colliding name first.
+- Broken agent symlinks are removed during installation.
+- Before changing an existing `~/.claude/CLAUDE.md`, the global-rules phase
+  creates `~/.claude/CLAUDE.md.<timestamp>.backup`.
+- Only the content between the managed rule markers is replaced. Content
+  outside those markers remains user-owned.
 
 Restart Claude Code after installation so it reloads agents, rules, and skills.
+
+## Troubleshooting
+
+### Agents or skills do not appear
+
+Rerun the installer and restart Claude Code. Agent and skill installations use
+symlinks, so moving the checkout makes those links stale. Rerunning the
+installer from the checkout's new location repairs repository-managed links.
+
+### Global rules were overwritten
+
+Look for `~/.claude/CLAUDE.md.<timestamp>.backup`. The installer creates this
+backup before it changes an existing global configuration. If installation
+fails after the backup is created, it attempts to restore that backup.
+
+### The global-rules phase cannot find Claude configuration
+
+Confirm that `~/.claude` exists and is writable, then rerun:
+
+```bash
+./claude/install/02_install_global_agents.sh
+```
 
 ## Testing
 
@@ -103,5 +133,3 @@ Validate installer shell scripts separately with:
 ```bash
 shellcheck claude/install/*.sh
 ```
-
-For troubleshooting and preservation details, see [Installation](../INSTALL.md).
