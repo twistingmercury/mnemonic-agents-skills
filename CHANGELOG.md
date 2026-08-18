@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-08-17
+
+### Changed
+
+- Reorganized Claude and Codex agents, installers, and tests under their
+  respective top-level platform directories.
+- Moved portable skills to `shared/skills/` and the shared print helper to
+  `lib/print.sh`.
+- Renamed installer phases to snake_case and removed the legacy root-level
+  `install/`, `agents/`, and `skills/` directories.
+
 ## [1.0.0] - 2026-03-16
 
 ### Added
