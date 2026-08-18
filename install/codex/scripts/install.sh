@@ -13,15 +13,27 @@ export TIMESTAMP="${TIMESTAMP:-$(date +%Y%m%d-%H%M%S)}"
 . "${MNEMONIC_INSTALL_ROOT}/lib/print.sh"
 
 main(){
-    print::info "Starting Codex skill installation from ${PROJ_ROOT}"
+    print::info "Starting Codex installation from ${PROJ_ROOT}"
 
-    print::info "Installing shared and Codex skills..."
-    if ! "${SCRIPTS}/03-install-skills.sh"; then
-        print::error "Failed to install skills"
+    print::info "Step 1/3: Installing agent definitions..."
+    if ! "${SCRIPTS}/01-install-agents.sh"; then
+        print::error "Failed to install agent definitions"
         return 1
     fi
 
-    print::success "Codex skill installation completed"
+    print::info "Step 2/3: Installing global agent rules..."
+    if ! "${SCRIPTS}/02-install-global-agent-rules.sh"; then
+        print::error "Failed to install global agent rules"
+        return 2
+    fi
+
+    print::info "Step 3/3: Installing shared and Codex skills..."
+    if ! "${SCRIPTS}/03-install-skills.sh"; then
+        print::error "Failed to install skills"
+        return 3
+    fi
+
+    print::success "Codex installation completed"
     return 0
 }
 

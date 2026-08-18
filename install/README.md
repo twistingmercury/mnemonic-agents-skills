@@ -8,6 +8,14 @@ The Claude Code installer handles three tasks:
 - Install the managed global rules block into `~/.claude/CLAUDE.md`
 - Symlink skill bundles into `~/.claude/skills/`
 
+The Codex installer handles three tasks:
+
+- Flatten and symlink native agent definitions into `$CODEX_HOME/agents/`
+- Symlink the global coordination rules as `$CODEX_HOME/AGENTS.md`
+- Symlink skill bundles into `$CODEX_HOME/skills/`
+
+`CODEX_HOME` defaults to `~/.codex` when unset.
+
 ## Prerequisites
 
 - Claude Code installed
@@ -36,7 +44,7 @@ The platform entrypoints can also be run directly:
 
 Each installer stops on its first failure.
 
-Restart Claude Code after installation so the updated agents, rules, and skills are picked up.
+Restart the target client after installation so the updated agents, rules, and skills are picked up.
 
 ## Claude Code Manual Steps
 
@@ -87,17 +95,52 @@ Behavior:
 
 ## Codex Manual Steps
 
-The initial Codex installer installs portable skills from `skills/shared/` and native Codex skills from `skills/codex/` into `~/.agents/skills/`:
+### 01-install-agents.sh
+
+Recursively discovers native TOML definitions under `agents/codex/`, flattens them by basename, and symlinks them into `$CODEX_HOME/agents/`:
+
+```bash
+./install/codex/scripts/01-install-agents.sh
+```
+
+Behavior:
+
+- Creates `$CODEX_HOME/agents/` if it does not exist
+- Replaces stale or broken repo-managed agent symlinks
+- Preserves unrelated user-created agents and existing non-symlink paths
+- Keeps current symlinks unless `FORCE=1`
+
+### 02-install-global-agent-rules.sh
+
+Links `agents/codex/global-agents.md` as `$CODEX_HOME/AGENTS.md`:
+
+```bash
+./install/codex/scripts/02-install-global-agent-rules.sh
+```
+
+Behavior:
+
+- Creates `$CODEX_HOME` when needed
+- Creates an absolute symlink so source updates are available without reinstalling
+- Keeps a correct link and repairs stale or broken repository-managed links
+- Preserves unrelated symlinks and existing non-symlink paths by default
+- Warns when a nonempty `$CODEX_HOME/AGENTS.override.md` makes the installed rules inactive
+
+Restart Codex after changing or reinstalling global guidance because Codex loads its instruction chain once per run or launched session.
+
+### 03-install-skills.sh
+
+Installs portable skills from `skills/shared/` and optional native Codex skills from `skills/codex/` into `$CODEX_HOME/skills/`:
 
 ```bash
 ./install/codex/scripts/03-install-skills.sh
 ```
 
-Native Codex agent definitions are stored under `agents/codex/` and validated by `install/codex/tests/`. Codex agent and global `AGENTS.md` installation will be added next.
+Agent definitions and installer behavior are validated by `install/codex/tests/`.
 
 ## Force Reinstall
 
-To reinstall even when dates are current:
+To refresh repository-managed content:
 
 ```bash
 FORCE=1 ./install/claude/scripts/install.sh
@@ -106,7 +149,7 @@ FORCE=1 ./install/codex/scripts/install.sh
 
 ## Testing
 
-The Claude installer scripts have BATS unit tests in `install/claude/tests/`. Run them with:
+Both platform installers have BATS tests under their respective `tests/` directories. Run them with:
 
 ```bash
 make test
@@ -127,3 +170,9 @@ Restart Claude Code after running the installer.
 ### Global rules were overwritten unexpectedly
 
 Check for a `~/.claude/CLAUDE.md.<timestamp>.backup` file. The installer creates a backup before updating an existing config.
+
+### Codex global rules were not linked
+
+The Codex installer preserves an existing user-owned `$CODEX_HOME/AGENTS.md`. Move that file out of the way only if you intend the repository to own the complete global guidance file, then rerun `02-install-global-agent-rules.sh`.
+
+If `$CODEX_HOME/AGENTS.override.md` is nonempty, Codex loads it instead of `$CODEX_HOME/AGENTS.md` until the override is removed.

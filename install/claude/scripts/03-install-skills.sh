@@ -18,8 +18,11 @@ skill_source_dirs() {
         return 0
     fi
 
-    # Platform-specific definitions take precedence over shared definitions.
-    printf '%s\n' "${PLATFORM_SKILL_SOURCE}" "${SHARED_SKILL_SOURCE}"
+    # Platform-specific definitions take precedence when the optional directory exists.
+    if [ -d "${PLATFORM_SKILL_SOURCE}" ]; then
+        printf '%s\n' "${PLATFORM_SKILL_SOURCE}"
+    fi
+    printf '%s\n' "${SHARED_SKILL_SOURCE}"
 }
 
 validate_environment() {
@@ -92,23 +95,23 @@ remove_repo_managed_skills() {
 
     printf "Scanning existing skills...\n"
 
-    for skill_dir in "${SKILLS_DIR}"*/; do
-        if [ ! -d "${skill_dir}" ] && [ ! -L "${skill_dir}" ]; then
+    for skill_path in "${SKILLS_DIR%/}"/*; do
+        # Unlike -e and a trailing-slash glob, -L also recognizes broken symlinks.
+        if [ ! -e "${skill_path}" ] && [ ! -L "${skill_path}" ]; then
             continue
         fi
 
         local skill_name
-        local skill_path
         local expected_source
-        skill_path="${skill_dir%/}"
         skill_name="$(basename "${skill_path}")"
-        expected_source="$(find_skill_source "${skill_name}")"
 
         if ! is_repo_managed_skill "${skill_name}" "${source_skills}"; then
             printf "  Preserving user skill: %s\n" "${skill_name}"
             preserved_count=$((preserved_count + 1))
             continue
         fi
+
+        expected_source="$(find_skill_source "${skill_name}")"
 
         if [ "${FORCE}" -ne 1 ] && [ -L "${skill_path}" ] && [ -d "${skill_path}" ] && [ "$(cd "${skill_path}" && pwd -P)" = "$(cd "${expected_source}" && pwd -P)" ]; then
             printf "  Keeping existing symlink: %s\n" "${skill_name}"
@@ -160,7 +163,10 @@ symlink_repo_skills() {
             continue
         fi
 
-        ln -s "${source_dir}" "${target_link}"
+        if ! ln -s "${source_dir}" "${target_link}"; then
+            printf "ERROR: failed to install skill: %s\n" "${skill_name}" >&2
+            return 1
+        fi
         printf "  Installed: %s\n" "${skill_name}"
         installed_count=$((installed_count + 1))
     done < <(list_repo_skill_dirs)

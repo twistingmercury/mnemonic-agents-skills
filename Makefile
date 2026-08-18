@@ -10,7 +10,7 @@ install: install-claude ## Install the Claude Code integration (default).
 install-claude: ## Install Claude Code agents, global rules, and skills.
 	./install/claude/scripts/install.sh
 
-install-codex: ## Install shared and Codex-specific skills.
+install-codex: ## Install Codex agents, global rules, and shared/Codex-specific skills.
 	./install/codex/scripts/install.sh
 
 install-all: install-claude install-codex ## Install both platform integrations.

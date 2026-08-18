@@ -1,7 +1,7 @@
 # Claude Code and Codex Agent Ecosystem
 
 > **Maturity Level**: Basic - Ready for use. The agent catalog is usable now and will continue to evolve as workflows improve.
-> **Version**: v1.0.0
+> **Version**: v1.0.4
 >
 > - **Emerging**: Prototype, not production-ready, expect breaking changes
 > - **Basic**: Production-ready but actively evolving, expect minor version changes
@@ -19,14 +19,18 @@ Specialized development agents and skills for AI-assisted software work in Claud
 
 ## Usage
 
-### Invoking agents
+### Using agents
 
-You can request a specific agent by name, or simply describe the work and let Claude decide which specialists to involve. Either way, Claude handles delegation — you do not invoke agent files directly.
+Request a specific agent by name or describe the work and let the configured client select specialists. Agent definition files are configuration sources; do not invoke them as scripts.
+
+The platform installers make the corresponding agent catalog available automatically. Claude Code uses Markdown definitions; Codex uses native TOML definitions.
+
+The catalog below uses Claude Code display names, which contain spaces; installed Claude definition filenames use hyphens. Codex identifiers use underscores instead (for example, `go_software_engineer`), and the exact TOML `name` values in the [Codex registry](agents/codex/global-agents.md#custom-agent-registry) are authoritative.
 
 ```text
 User: "Build a user management REST API in Go"
 
-Main Claude:
+Claude Code:
   1. Consults solutions architect for high-level direction
   2. Hands implementation planning to go software architect
   3. Sends API contract work to api architect
@@ -34,7 +38,7 @@ Main Claude:
   5. Delegates test coverage to go e2e test engineer
 ```
 
-For narrow tasks, Main Claude can delegate directly:
+For narrow tasks, Claude Code can delegate directly:
 
 ```text
 User: "Write BATS tests for scripts/backup.sh"
@@ -58,48 +62,49 @@ User: "Review this Go diff for correctness risks"
 | Documentation and review | `technical writer`, `code reviewer`                                                                                                                 |
 | Support                  | `rlm subcall agent`                                                                                                                                 |
 
-See [ABOUT-THE-AGENTS.md](agents/claude/ABOUT-THE-AGENTS.md) for Claude Code workflow examples and role boundaries. Native Codex TOML definitions are available under `agents/codex/`; installation support is the next migration step.
+See [ABOUT-THE-AGENTS.md](agents/claude/ABOUT-THE-AGENTS.md) for Claude Code workflow examples and role boundaries. See [Codex Agents](agents/codex/README.md) for the native Codex definition format and conventions.
 
 ### Skill catalog
 
-Portable skills live under `skills/shared/`; platform-specific skills live under `skills/claude/` or `skills/codex/`. Claude Code installs shared and Claude-specific skills into `~/.claude/skills/`. Codex installs shared and Codex-specific skills into `~/.agents/skills/`.
+Portable skills live under `skills/shared/`; platform-specific skills live under `skills/claude/` or `skills/codex/`. Claude Code installs shared and Claude-specific skills into `~/.claude/skills/`. Codex installs shared and Codex-specific skills into `$CODEX_HOME/skills/`, defaulting to `~/.codex/skills/`.
 
-| Skill                    | Purpose                                                   |
-| ------------------------ | --------------------------------------------------------- |
-| `arch-docs`              | Create and update architecture documentation              |
-| `code-review`            | Orchestrate parallel code review across multiple concerns |
-| `docker-first-ci`        | Implement and harden Docker-first CI/CD pipelines         |
-| `prime`                  | Prime Claude's context before complex tasks               |
+| Skill                    | Purpose                                                    |
+| ------------------------ | ---------------------------------------------------------- |
+| `arch-docs`              | Create and update architecture documentation               |
+| `code-review`            | Orchestrate parallel code review across multiple concerns  |
+| `docker-first-ci`        | Implement and harden Docker-first CI/CD pipelines          |
+| `prime`                  | Survey a repository and build context before starting work |
 | `ralph-loop-docs-writer` | Create PRD and prompt files for agent-agnostic Ralph loops |
-| `readme-writer`          | Create or update project READMEs from a standard template |
-| `rlm`                    | Run long-context tasks using a persistent Python REPL     |
-| `shell-script`           | Generate shell scripts with automatic BATS test coverage  |
+| `readme-writer`          | Create or update project READMEs from a standard template  |
+| `rlm`                    | Run long-context tasks using a persistent Python REPL      |
+| `shell-script`           | Generate shell scripts with automatic BATS test coverage   |
 
 ## How it works
 
-This repo ships three things:
+This repository contains three integration layers:
 
 - Platform-specific agent definitions under `agents/claude/` and `agents/codex/`
-- Platform-specific global guidance alongside each agent catalog
-- Shared and platform-specific skill bundles under `skills/`
+- Platform-specific global delegation guidance under `agents/claude/` and `agents/codex/`
+- Portable skills under `skills/shared/`, with optional platform-specific skill directories
 
-Installers are separated under `install/claude/` and `install/codex/`. The Claude installer links agents, updates `~/.claude/CLAUDE.md`, and installs applicable skills. The initial Codex installer installs shared and Codex-specific skills; native Codex agent and `AGENTS.md` installation will be added with the agent ports.
+Installers are separated by platform:
 
-The installation flow is intentionally small:
+| Platform    | Installed content                                                                                     |
+| ----------- | ----------------------------------------------------------------------------------------------------- |
+| Claude Code | Agent symlinks, a managed rules block in `~/.claude/CLAUDE.md`, and skills in `~/.claude/skills/`     |
+| Codex       | Agent symlinks, global `AGENTS.md`, and skills under `$CODEX_HOME`, defaulting to `~/.codex/`         |
 
-1. Install or refresh repo-managed agent symlinks.
-2. Install or refresh the managed global agent rules block.
-3. Install or refresh skill bundles.
-
-User-created agents are preserved. The installer only removes agents whose basenames match files managed by this repository.
+Both skill installers combine the shared skill directory with an optional platform-specific directory. Platform-specific definitions take precedence when both sources contain the same skill name.
 
 ## Key Considerations
 
 **This is a reference implementation, not a framework.** Adapt the agent prompts and delegation model to match your own workflow.
 
-**Global rules are part of the Claude install.** Running the Claude installer updates the managed rules block in `~/.claude/CLAUDE.md` using `agents/claude/global-agent-rules.md`. Review that file before installing if you maintain custom coordination rules.
+**Global rules are part of both platform installs.** The Claude installer updates a managed block in `~/.claude/CLAUDE.md`. The Codex installer links `$CODEX_HOME/AGENTS.md` to `agents/codex/global-agents.md`, which defines global coordination behavior and the custom-agent routing registry. A nonempty `$CODEX_HOME/AGENTS.override.md` suppresses `$CODEX_HOME/AGENTS.md`; restarting Codex does not activate the installed rules until the override is removed or emptied. Review the relevant source before installing if you maintain custom global instructions.
 
-**The installer preserves user work where possible.** Repo-managed agents are refreshed; unrelated user-created agents in `~/.claude/agents/` are left in place.
+**Review name conflicts before installing.** Agent and skill entries are classified by repository basename, so same-named paths can be removed and replaced even when they are not symlinks. The Claude agent installer also removes broken `.md` symlinks. For Codex global rules, a non-symlink `$CODEX_HOME/AGENTS.md` is preserved; an unrelated symlink is preserved by default but replaced when `FORCE=1`. See [install details](install/README.md) for complete preservation and replacement behavior.
+
+**Agents, skills, and Codex global rules use symlinks.** Claude global rules are copied into a managed block instead. Keep the repository checkout available after installation; moving it makes symlinked content stale, so rerun the appropriate installer from the new location to repair it.
 
 ## Development Considerations
 
@@ -116,15 +121,15 @@ User-created agents are preserved. The installer only removes agents whose basen
 
 2. Restart the target client so it reloads installed agents, rules, and skills.
 
-3. Review [ABOUT-THE-AGENTS.md](agents/claude/ABOUT-THE-AGENTS.md) before changing Claude Code delegation behavior.
+3. Review [ABOUT-THE-AGENTS.md](agents/claude/ABOUT-THE-AGENTS.md) before changing Claude Code delegation behavior, or [global-agents.md](agents/codex/global-agents.md) before changing Codex coordination and routing.
 
 ### Building & running
 
-The Claude installer is [install.sh](install/claude/scripts/install.sh). It runs these scripts in sequence:
+The Claude installer at [install.sh](install/claude/scripts/install.sh) runs these scripts in sequence:
 
 | Script                             | Purpose                                                                                     |
 | ---------------------------------- | ------------------------------------------------------------------------------------------- |
-| `01-install-agents.sh`             | Symlink repo-managed agents into `~/.claude/agents/` while preserving unrelated user agents |
+| `01-install-agents.sh`             | Symlink repo-managed agents into `~/.claude/agents/`                                        |
 | `02-install-global-agent-rules.sh` | Update the managed agent rules block in `~/.claude/CLAUDE.md`                               |
 | `03-install-skills.sh`             | Install skill bundles into `~/.claude/skills/`                                              |
 
@@ -142,14 +147,45 @@ To force reinstall even when dates are current:
 FORCE=1 ./install/claude/scripts/install.sh
 ```
 
+The Codex installer runs these phases in order:
+
+| Script                             | Purpose                                                                    |
+| ---------------------------------- | -------------------------------------------------------------------------- |
+| `01-install-agents.sh`             | Flatten and link native TOML agents into `$CODEX_HOME/agents/`             |
+| `02-install-global-agent-rules.sh` | Link `agents/codex/global-agents.md` as `$CODEX_HOME/AGENTS.md`            |
+| `03-install-skills.sh`             | Install shared and Codex-specific skills into `$CODEX_HOME/skills/`        |
+
+`CODEX_HOME` defaults to `~/.codex`. The installer supports the same `FORCE=1` override:
+
+```bash
+./install/codex/scripts/install.sh
+FORCE=1 ./install/codex/scripts/install.sh
+```
+
+The phases can also be run individually:
+
+```bash
+./install/codex/scripts/01-install-agents.sh
+./install/codex/scripts/02-install-global-agent-rules.sh
+./install/codex/scripts/03-install-skills.sh
+```
+
 See [install/README.md](install/README.md) for install details and behavior.
 
 ### Testing
 
-Run the BATS unit test suite (requires `bats` on `PATH`):
+Run both BATS suites (requires `bats` and Python 3.11+ on `PATH`):
 
 ```bash
 make test
+```
+
+Run one platform suite with `make test-claude` or `make test-codex`.
+
+Run the RLM unit tests directly:
+
+```bash
+(cd skills/shared/rlm && python3 -m unittest discover -s tests -v)
 ```
 
 Validate the shell scripts with ShellCheck:
@@ -170,4 +206,4 @@ Version is determined from git tags:
 git describe --tags --always
 ```
 
-Current version: `v1.0.0`.
+Current version: `v1.0.4`.

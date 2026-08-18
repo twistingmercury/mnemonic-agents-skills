@@ -3,6 +3,77 @@
 REPO_ROOT="$(cd "$(dirname "$BATS_TEST_FILENAME")/../../.." && pwd)"
 SHARED_SKILLS_ROOT="${REPO_ROOT}/skills/shared"
 
+@test "Codex skills use the configured Codex home" {
+    local codex_home="${BATS_TEST_TMPDIR}/codex-home"
+
+    run env REPO_ROOT="${REPO_ROOT}" CODEX_HOME="${codex_home}" bash -c '
+        set -euo pipefail
+        unset SKILLS_DIR
+        source "${REPO_ROOT}/install/codex/scripts/03-install-skills.sh"
+        printf "%s\n" "${SKILLS_DIR}"
+    '
+
+    [ "$status" -eq 0 ]
+    [ "$output" = "${codex_home}/skills/" ]
+}
+
+@test "Codex skills default to the .codex directory under HOME" {
+    local test_home="${BATS_TEST_TMPDIR}/home"
+
+    run env -u CODEX_HOME REPO_ROOT="${REPO_ROOT}" HOME="${test_home}" bash -c '
+        set -euo pipefail
+        unset SKILLS_DIR
+        source "${REPO_ROOT}/install/codex/scripts/03-install-skills.sh"
+        printf "%s\n" "${SKILLS_DIR}"
+    '
+
+    [ "$status" -eq 0 ]
+    [ "$output" = "${test_home}/.codex/skills/" ]
+}
+
+@test "Codex replaces stale skill symlinks without a platform-specific skill directory" {
+    local skills_dir="${BATS_TEST_TMPDIR}/skills"
+    mkdir -p "${skills_dir}"
+    ln -s "${BATS_TEST_TMPDIR}/old-skills/prime" "${skills_dir}/prime"
+
+    run env REPO_ROOT="${REPO_ROOT}" SKILLS_DIR="${skills_dir}/" bash -c '
+        set -euo pipefail
+        PROJ_ROOT="${REPO_ROOT}"
+        PLATFORM_SKILL_SOURCE="${REPO_ROOT}/skills/codex"
+        SHARED_SKILL_SOURCE="${REPO_ROOT}/skills/shared"
+        source "${REPO_ROOT}/install/codex/scripts/03-install-skills.sh"
+        install_skills
+        test -L "${SKILLS_DIR}/prime"
+        test "$(readlink "${SKILLS_DIR}/prime")" = "${SHARED_SKILL_SOURCE}/prime"
+    '
+
+    [ "$status" -eq 0 ]
+}
+
+@test "prime has loadable Codex skill metadata" {
+    run python3 - "${SHARED_SKILLS_ROOT}/prime/SKILL.md" <<'PY'
+from pathlib import Path
+import re
+import sys
+
+skill_file = Path(sys.argv[1])
+content = skill_file.read_text()
+match = re.match(r"^---\n(.*?)\n---\n", content, re.DOTALL)
+assert match, "prime is missing YAML frontmatter"
+
+fields = {}
+for line in match.group(1).splitlines():
+    key, separator, value = line.partition(":")
+    assert separator, f"invalid frontmatter line: {line}"
+    fields[key.strip()] = value.strip()
+
+assert fields.get("name") == skill_file.parent.name
+assert fields.get("description"), "prime is missing a description"
+PY
+
+    [ "$status" -eq 0 ]
+}
+
 @test "converted skills are shared" {
     [ -f "${SHARED_SKILLS_ROOT}/code-review/SKILL.md" ]
     [ -f "${SHARED_SKILLS_ROOT}/rlm/SKILL.md" ]

@@ -47,6 +47,17 @@ teardown() {
     [[ "$output" == *"prime"* ]]
 }
 
+@test "list_repo_skills: discovers shared skills when platform source is absent" {
+    SKILL_SOURCE=""
+    PLATFORM_SKILL_SOURCE="${TEST_TMP}/missing-platform-skills"
+    SHARED_SKILL_SOURCE="${TEST_TMP}/shared-skills"
+    mkdir -p "${SHARED_SKILL_SOURCE}/prime"
+
+    run list_repo_skills
+    [ "$status" -eq 0 ]
+    [ "$output" = "prime" ]
+}
+
 # ---------------------------------------------------------------------------
 # is_repo_managed_skill
 # ---------------------------------------------------------------------------
@@ -93,6 +104,15 @@ teardown() {
     run remove_repo_managed_skills
     [ "$status" -eq 0 ]
     [ ! -e "${SKILLS_DIR}/prime" ]
+}
+
+@test "remove_repo_managed_skills: removes broken repo-managed symlink" {
+    mkdir -p "${SKILL_SOURCE}/prime" "${SKILLS_DIR}"
+    ln -s "${TEST_TMP}/old-skills/prime" "${SKILLS_DIR}/prime"
+
+    run remove_repo_managed_skills
+    [ "$status" -eq 0 ]
+    [ ! -L "${SKILLS_DIR}/prime" ]
 }
 
 @test "remove_repo_managed_skills: preserves user skill not in repo list" {
@@ -153,4 +173,14 @@ teardown() {
     [ "$status" -eq 0 ]
     [[ "$output" == *"Skipping existing non-symlink"* ]]
     [ ! -L "${SKILLS_DIR}/prime" ]
+}
+
+@test "symlink_repo_skills: reports link creation failure" {
+    mkdir -p "${SKILL_SOURCE}/prime" "${SKILLS_DIR}"
+    ln -s "${TEST_TMP}/missing/prime" "${SKILLS_DIR}/prime"
+
+    run symlink_repo_skills
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"failed to install skill: prime"* ]]
+    [[ "$output" != *"Installed: prime"* ]]
 }
