@@ -72,7 +72,7 @@ model also couples a working installation to the checkout's absolute location.
   - Verify: `bats codex/tests/04-install-agents.bats`
   - Done: The BATS suite exits 0 and its materialization, preservation, refresh, and legacy-migration assertions all pass without relying on agent symlinks.
 
-- [ ] **Cycle 2 - Materialize managed skill directories**: Replace skill-directory links with manifest-owned rsync copies, including safe synchronization and legacy migration.
+- [x] **Cycle 2 - Materialize managed skill directories**: Replace skill-directory links with manifest-owned rsync copies, including safe synchronization and legacy migration.
   - Agent: `shell_script_engineer`
   - Files: `codex/install/03_install_skills.sh`, `codex/install/lib/managed_state.sh`, `codex/tests/03-shared-skills.bats`
   - Steps:
