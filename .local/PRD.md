@@ -83,7 +83,7 @@ model also couples a working installation to the checkout's absolute location.
   - Verify: `bats codex/tests/03-shared-skills.bats`
   - Done: The skills test suite exits 0 and confirms every installed managed skill is a local directory rather than a symlink.
 
-- [ ] **Cycle 3 - Materialize global Codex rules**: Replace the global `AGENTS.md` link with a manifest-owned copied file while retaining precedence warnings and user-content protections.
+- [x] **Cycle 3 - Materialize global Codex rules**: Replace the global `AGENTS.md` link with a manifest-owned copied file while retaining precedence warnings and user-content protections.
   - Agent: `shell_script_engineer`
   - Files: `codex/install/02_install_global_agents.sh`, `codex/install/lib/managed_state.sh`, `codex/tests/02-install-global-agent-rules.bats`
   - Steps:
