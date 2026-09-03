@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Materialized Codex agents, skills, and global rules as manifest-owned local
+  copies rather than repository symlinks, allowing Codex to load them without
+  depending on the checkout location.
+
 ### Changed
 
 - Changed the project license from Apache-2.0 to MIT.
