@@ -35,25 +35,116 @@ SHARED_SKILLS_ROOT="${REPO_ROOT}/shared/skills"
     [ "$output" = "${test_home}/.codex/skills/" ]
 }
 
-@test "Codex replaces stale skill symlinks without a platform-specific skill directory" {
-    local skills_dir="${BATS_TEST_TMPDIR}/skills"
-    mkdir -p "${skills_dir}"
-    ln -s "${BATS_TEST_TMPDIR}/old-skills/prime" "${skills_dir}/prime"
+@test "Codex materializes skills as regular, source-independent directories" {
+    local codex_home="${BATS_TEST_TMPDIR}/codex-home"
+    local source_root="${BATS_TEST_TMPDIR}/source-skills"
+    mkdir -p "${source_root}/prime"
+    printf 'source version\n' > "${source_root}/prime/SKILL.md"
 
-    # Variables expand in the child shell.
-    # shellcheck disable=SC2016
-    run env REPO_ROOT="${REPO_ROOT}" SKILLS_DIR="${skills_dir}/" bash -c '
-        set -euo pipefail
-        PROJ_ROOT="${REPO_ROOT}"
-        PLATFORM_SKILL_SOURCE="${REPO_ROOT}/codex/skills"
-        SHARED_SKILL_SOURCE="${REPO_ROOT}/shared/skills"
-        source "${REPO_ROOT}/codex/install/03_install_skills.sh"
-        install_skills
-        test -L "${SKILLS_DIR}/prime"
-        test "$(readlink "${SKILLS_DIR}/prime")" = "${SHARED_SKILL_SOURCE}/prime"
-    '
+    run env CODEX_HOME="${codex_home}" SKILL_SOURCE="${source_root}" \
+        "${REPO_ROOT}/codex/install/03_install_skills.sh"
 
     [ "$status" -eq 0 ]
+    [ -d "${codex_home}/skills/prime" ]
+    [ ! -L "${codex_home}/skills/prime" ]
+    [ "$(cat "${codex_home}/skills/prime/SKILL.md")" = 'source version' ]
+    rm -rf "${source_root}"
+    [ "$(cat "${codex_home}/skills/prime/SKILL.md")" = 'source version' ]
+    grep -qxF 'skills/prime' "${codex_home}/.mnemonic-agents-skills/managed-paths"
+}
+
+@test "Codex refreshes manifest-owned skill directories" {
+    local codex_home="${BATS_TEST_TMPDIR}/codex-home"
+    local source_root="${BATS_TEST_TMPDIR}/source-skills"
+    mkdir -p "${source_root}/prime"
+    printf 'first version\n' > "${source_root}/prime/SKILL.md"
+    env CODEX_HOME="${codex_home}" SKILL_SOURCE="${source_root}" \
+        "${REPO_ROOT}/codex/install/03_install_skills.sh" >/dev/null
+    printf 'second version\n' > "${source_root}/prime/SKILL.md"
+    printf 'stale\n' > "${codex_home}/skills/prime/stale.md"
+
+    run env CODEX_HOME="${codex_home}" SKILL_SOURCE="${source_root}" FORCE=1 \
+        "${REPO_ROOT}/codex/install/03_install_skills.sh"
+
+    [ "$status" -eq 0 ]
+    [ ! -L "${codex_home}/skills/prime" ]
+    [ "$(cat "${codex_home}/skills/prime/SKILL.md")" = 'second version' ]
+    [ ! -e "${codex_home}/skills/prime/stale.md" ]
+}
+
+@test "Codex preserves untracked colliding skills and unrelated symlinks" {
+    local codex_home="${BATS_TEST_TMPDIR}/codex-home"
+    local source_root="${BATS_TEST_TMPDIR}/source-skills"
+    local user_source="${BATS_TEST_TMPDIR}/user-skills"
+    mkdir -p "${source_root}/prime" "${source_root}/writer" \
+        "${codex_home}/skills/prime" "${user_source}/writer"
+    printf 'repository\n' > "${source_root}/prime/SKILL.md"
+    printf 'repository\n' > "${source_root}/writer/SKILL.md"
+    printf 'user override\n' > "${codex_home}/skills/prime/SKILL.md"
+    printf 'external\n' > "${user_source}/writer/SKILL.md"
+    ln -s "${user_source}/writer" "${codex_home}/skills/writer"
+
+    run env CODEX_HOME="${codex_home}" SKILL_SOURCE="${source_root}" FORCE=1 \
+        "${REPO_ROOT}/codex/install/03_install_skills.sh"
+
+    [ "$status" -eq 0 ]
+    [ "$(cat "${codex_home}/skills/prime/SKILL.md")" = 'user override' ]
+    [ -L "${codex_home}/skills/writer" ]
+    [ "$(readlink "${codex_home}/skills/writer")" = "${user_source}/writer" ]
+}
+
+@test "Codex migrates recognized repository skill symlinks to regular directories" {
+    local codex_home="${BATS_TEST_TMPDIR}/codex-home"
+    local source_root="${BATS_TEST_TMPDIR}/source-skills"
+    local legacy_root="${BATS_TEST_TMPDIR}/legacy/shared/skills"
+    mkdir -p "${source_root}/prime" "${legacy_root}/prime" "${codex_home}/skills"
+    printf 'current source\n' > "${source_root}/prime/SKILL.md"
+    printf 'legacy source\n' > "${legacy_root}/prime/SKILL.md"
+    ln -s "${legacy_root}/prime" "${codex_home}/skills/prime"
+
+    run env CODEX_HOME="${codex_home}" SKILL_SOURCE="${source_root}" \
+        "${REPO_ROOT}/codex/install/03_install_skills.sh"
+
+    [ "$status" -eq 0 ]
+    [ -d "${codex_home}/skills/prime" ]
+    [ ! -L "${codex_home}/skills/prime" ]
+    [ "$(cat "${codex_home}/skills/prime/SKILL.md")" = 'current source' ]
+}
+
+@test "Codex reports an actionable error when rsync is unavailable" {
+    local codex_home="${BATS_TEST_TMPDIR}/codex-home"
+    local source_root="${BATS_TEST_TMPDIR}/source-skills"
+    local no_rsync_bin="${BATS_TEST_TMPDIR}/no-rsync-bin"
+    local utility
+    mkdir -p "${source_root}/prime" "${no_rsync_bin}"
+    printf 'source\n' > "${source_root}/prime/SKILL.md"
+    for utility in bash dirname find sort basename mkdir mktemp rm mv grep cat readlink; do
+        ln -s "$(command -v "${utility}")" "${no_rsync_bin}/${utility}"
+    done
+
+    run env CODEX_HOME="${codex_home}" SKILL_SOURCE="${source_root}" \
+        PATH="${no_rsync_bin}" "${REPO_ROOT}/codex/install/03_install_skills.sh"
+
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"rsync is required"* ]]
+}
+
+@test "Codex does not record a skill as managed when materialization fails" {
+    local codex_home="${BATS_TEST_TMPDIR}/codex-home"
+    local source_root="${BATS_TEST_TMPDIR}/source-skills"
+    local fake_bin="${BATS_TEST_TMPDIR}/fake-bin"
+    mkdir -p "${source_root}/prime" "${fake_bin}"
+    printf 'source\n' > "${source_root}/prime/SKILL.md"
+    printf '#!/usr/bin/env bash\nexit 73\n' > "${fake_bin}/rsync"
+    chmod +x "${fake_bin}/rsync"
+
+    run env CODEX_HOME="${codex_home}" SKILL_SOURCE="${source_root}" \
+        PATH="${fake_bin}:${PATH}" "${REPO_ROOT}/codex/install/03_install_skills.sh"
+
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"failed to materialize skill: prime"* ]]
+    [ ! -e "${codex_home}/skills/prime" ]
+    [ ! -e "${codex_home}/.mnemonic-agents-skills/managed-paths" ]
 }
 
 @test "prime has loadable Codex skill metadata" {

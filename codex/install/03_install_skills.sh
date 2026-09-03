@@ -8,8 +8,11 @@ PROJ_ROOT="${PROJ_ROOT:-$(cd "${SCRIPTS}/../.." && pwd)}"
 SKILL_SOURCE="${SKILL_SOURCE:-}"
 SHARED_SKILL_SOURCE="${SHARED_SKILL_SOURCE:-${PROJ_ROOT}/shared/skills}"
 PLATFORM_SKILL_SOURCE="${PLATFORM_SKILL_SOURCE:-${PROJ_ROOT}/codex/skills}"
-SKILLS_DIR="${SKILLS_DIR:-${CODEX_HOME:-${HOME}/.codex}/skills/}"
-FORCE="${FORCE:-0}"
+CODEX_HOME="${CODEX_HOME:-${HOME}/.codex}"
+SKILLS_DIR="${SKILLS_DIR:-${CODEX_HOME}/skills/}"
+
+# shellcheck source=lib/managed_state.sh disable=SC1091
+. "${SCRIPTS}/lib/managed_state.sh"
 
 skill_source_dirs() {
     if [ -n "${SKILL_SOURCE}" ]; then
@@ -24,6 +27,23 @@ skill_source_dirs() {
     printf '%s\n' "${SHARED_SKILL_SOURCE}"
 }
 
+is_unsafe_skills_dir() {
+    local resolved_dir
+
+    if [ -z "${SKILLS_DIR}" ] || [ -z "${SKILLS_DIR//\//}" ]; then
+        return 0
+    fi
+
+    if [ -d "${SKILLS_DIR}" ]; then
+        if ! resolved_dir="$(cd "${SKILLS_DIR}" && pwd -P)"; then
+            return 0
+        fi
+        [ "${resolved_dir}" = "/" ] && return 0
+    fi
+
+    return 1
+}
+
 validate_environment() {
     local source_dir
 
@@ -33,6 +53,16 @@ validate_environment() {
             return 1
         fi
     done < <(skill_source_dirs)
+
+    if is_unsafe_skills_dir; then
+        printf "ERROR: SKILLS_DIR is unsafe: '%s'\n" "${SKILLS_DIR}" >&2
+        return 1
+    fi
+
+    if ! command -v rsync >/dev/null 2>&1; then
+        printf "ERROR: rsync is required to materialize Codex skills; install rsync and retry.\n" >&2
+        return 1
+    fi
 
     return 0
 }
@@ -45,14 +75,6 @@ list_repo_skills() {
     while IFS= read -r source_dir; do
         find "${source_dir}" -mindepth 1 -maxdepth 1 -type d -exec basename {} \;
     done < <(skill_source_dirs) | sort -u
-}
-
-list_repo_skill_dirs() {
-    local source_dir
-
-    while IFS= read -r source_dir; do
-        find "${source_dir}" -mindepth 1 -maxdepth 1 -type d
-    done < <(skill_source_dirs)
 }
 
 find_skill_source() {
@@ -69,106 +91,100 @@ find_skill_source() {
     return 1
 }
 
-is_repo_managed_skill() {
-    local skill_name="${1}"
-    local source_skills="${2}"
+is_recognized_legacy_skill_link() {
+    local link_target="${1}"
+    local skill_name="${2}"
+    local expected_source="${3}"
 
-    printf '%s\n' "${source_skills}" | grep -qxF "${skill_name}"
-}
-
-remove_repo_managed_skills() {
-    local removed_count=0
-    local preserved_count=0
-    local source_skills
-    source_skills="$(list_repo_skills)"
-
-    # Safety: refuse to operate if SKILLS_DIR is empty or root-like
-    if [ -z "${SKILLS_DIR}" ] || [ "${SKILLS_DIR}" = "/" ]; then
-        printf "ERROR: SKILLS_DIR is unsafe: '%s'\n" "${SKILLS_DIR}" >&2
-        return 1
-    fi
-
-    if [ ! -d "${SKILLS_DIR}" ]; then
+    if [ "${link_target}" = "${expected_source}" ]; then
         return 0
     fi
 
-    printf "Scanning existing skills...\n"
-
-    for skill_path in "${SKILLS_DIR%/}"/*; do
-        # Unlike -e and a trailing-slash glob, -L also recognizes broken symlinks.
-        if [ ! -e "${skill_path}" ] && [ ! -L "${skill_path}" ]; then
-            continue
-        fi
-
-        local skill_name
-        local expected_source
-        skill_name="$(basename "${skill_path}")"
-
-        if ! is_repo_managed_skill "${skill_name}" "${source_skills}"; then
-            printf "  Preserving user skill: %s\n" "${skill_name}"
-            preserved_count=$((preserved_count + 1))
-            continue
-        fi
-
-        expected_source="$(find_skill_source "${skill_name}")"
-
-        if [ "${FORCE}" -ne 1 ] && [ -L "${skill_path}" ] && [ -d "${skill_path}" ] && [ "$(cd "${skill_path}" && pwd -P)" = "$(cd "${expected_source}" && pwd -P)" ]; then
-            printf "  Keeping existing symlink: %s\n" "${skill_name}"
-            preserved_count=$((preserved_count + 1))
-            continue
-        fi
-
-        if [ -z "${skill_path}" ]; then
-            printf "ERROR: resolved empty skill path, skipping\n" >&2
-            continue
-        fi
-
-        printf "  Removing repo skill: %s\n" "${skill_name}"
-        rm -rf "${skill_path}"
-        removed_count=$((removed_count + 1))
-    done
-
-    printf "Removed %d repo skill(s), preserved %d user skill(s)\n" "${removed_count}" "${preserved_count}"
-    return 0
+    case "${link_target}" in
+        */shared/skills/"${skill_name}" | */codex/skills/"${skill_name}" | */skills/codex/"${skill_name}")
+            return 0
+            ;;
+    esac
+    return 1
 }
 
-symlink_repo_skills() {
+materialize_skill() {
+    local source_dir="${1}"
+    local target_dir="${2}"
+    local temporary_dir
+
+    if ! temporary_dir="$(mktemp -d "${target_dir}.tmp.XXXXXX")"; then
+        printf "ERROR: failed to create temporary skill directory: %s\n" "${target_dir}" >&2
+        return 1
+    fi
+    if ! rsync -a --delete "${source_dir}/" "${temporary_dir}/"; then
+        rm -rf "${temporary_dir}"
+        printf "ERROR: failed to materialize skill: %s\n" "$(basename "${source_dir}")" >&2
+        return 1
+    fi
+
+    # This function is called only for a new path, a recognized repository link,
+    # or a manifest-owned directory. Never remove an untracked user path.
+    if [ -e "${target_dir}" ] || [ -L "${target_dir}" ]; then
+        if ! rm -rf "${target_dir}"; then
+            rm -rf "${temporary_dir}"
+            printf "ERROR: failed to replace managed skill: %s\n" "$(basename "${source_dir}")" >&2
+            return 1
+        fi
+    fi
+    if ! mv "${temporary_dir}" "${target_dir}"; then
+        rm -rf "${temporary_dir}"
+        printf "ERROR: failed to install skill: %s\n" "$(basename "${source_dir}")" >&2
+        return 1
+    fi
+}
+
+install_repo_skills() {
     local installed_count=0
     local skipped_count=0
+    local skill_name
 
-    # Safety: refuse to operate if SKILLS_DIR is empty or root-like
-    if [ -z "${SKILLS_DIR}" ] || [ "${SKILLS_DIR}" = "/" ]; then
+    if is_unsafe_skills_dir; then
         printf "ERROR: SKILLS_DIR is unsafe: '%s'\n" "${SKILLS_DIR}" >&2
         return 1
     fi
 
     printf "Installing repo skills...\n"
 
-    while IFS= read -r source_dir; do
-        local skill_name
-        local target_link
-        skill_name="$(basename "${source_dir}")"
-        target_link="${SKILLS_DIR%/}/${skill_name}"
+    while IFS= read -r skill_name; do
+        local source_dir
+        local target_dir
+        local managed_path
+        local link_target
+        source_dir="$(find_skill_source "${skill_name}")"
+        target_dir="${SKILLS_DIR%/}/${skill_name}"
+        managed_path="skills/${skill_name}"
 
-        if [ -L "${target_link}" ] && [ -d "${target_link}" ]; then
-            printf "  Already installed (symlink exists): %s\n" "${skill_name}"
-            skipped_count=$((skipped_count + 1))
-            continue
-        fi
-
-        if [ -e "${target_link}" ]; then
+        if [ -L "${target_dir}" ]; then
+            if ! link_target="$(readlink "${target_dir}")"; then
+                printf "ERROR: failed to read skill link: %s\n" "${target_dir}" >&2
+                return 1
+            fi
+            if ! is_recognized_legacy_skill_link "${link_target}" "${skill_name}" "${source_dir}"; then
+                printf "  Preserving unrelated symlink: %s\n" "${skill_name}"
+                skipped_count=$((skipped_count + 1))
+                continue
+            fi
+        elif [ -e "${target_dir}" ] && ! managed_state_is_managed "${managed_path}"; then
             printf "  Skipping existing non-symlink path: %s\n" "${skill_name}"
             skipped_count=$((skipped_count + 1))
             continue
         fi
 
-        if ! ln -s "${source_dir}" "${target_link}"; then
-            printf "ERROR: failed to install skill: %s\n" "${skill_name}" >&2
+        if ! materialize_skill "${source_dir}" "${target_dir}"; then
+            return 1
+        fi
+        if ! managed_state_mark "${managed_path}"; then
             return 1
         fi
         printf "  Installed: %s\n" "${skill_name}"
         installed_count=$((installed_count + 1))
-    done < <(list_repo_skill_dirs)
+    done < <(list_repo_skills)
 
     printf "Installed %d repo skill(s), skipped %d existing skill(s)\n" "${installed_count}" "${skipped_count}"
     return 0
@@ -181,15 +197,13 @@ install_skills() {
 
     if [ ! -d "${SKILLS_DIR}" ]; then
         printf "Creating skills directory: %s\n" "${SKILLS_DIR}"
-        mkdir -p "${SKILLS_DIR}"
+        if ! mkdir -p "${SKILLS_DIR}"; then
+            printf "ERROR: failed to create skills directory: %s\n" "${SKILLS_DIR}" >&2
+            return 1
+        fi
     fi
 
-    if ! remove_repo_managed_skills; then
-        printf "ERROR: failed to remove repo skills\n" >&2
-        return 1
-    fi
-
-    if ! symlink_repo_skills; then
+    if ! install_repo_skills; then
         printf "ERROR: failed to install repo skills\n" >&2
         return 1
     fi
