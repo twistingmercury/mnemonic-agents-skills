@@ -9,3 +9,6 @@ Completed manifest-owned atomic rsync materialization for `AGENTS.md`, including
 
 2026-09-03 — Cycle 4 - Document and validate copy-based installation
 Updated Codex installation and troubleshooting guidance for manifest-owned materialization, including the `rsync` prerequisite, `FORCE=1` protections, legacy-link migration, user-content preservation, and Codex restart requirement. Added an unreleased changelog entry for the compatibility fix. Verified with `make test-codex` (68 passing BATS tests) and `git diff --check`. Follow-up: No unchecked cycles remain.
+
+2026-09-03 — Cycle 1 - Materialize managed agent definitions
+Revalidated the already-materialized, manifest-owned agent installation after the cycle was reopened. Verified with `bats codex/tests/04-install-agents.bats` (18 passing tests), `bash -n`, `shellcheck`, and `git diff --check`. Follow-up: Cycle 2 remains unchecked.
