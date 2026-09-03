@@ -6,8 +6,12 @@ SCRIPTS="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJ_ROOT="${PROJ_ROOT:-$(cd "${SCRIPTS}/../.." && pwd)}"
 
 AGENT_SOURCE="${AGENT_SOURCE:-${PROJ_ROOT}/codex/agents}"
+CODEX_HOME="${CODEX_HOME:-${HOME}/.codex}"
 AGENTS_DIR="${AGENTS_DIR:-${CODEX_HOME:-${HOME}/.codex}/agents/}"
 FORCE="${FORCE:-0}"
+
+# shellcheck source=lib/managed_state.sh disable=SC1091
+. "${SCRIPTS}/lib/managed_state.sh"
 
 is_unsafe_agents_dir() {
     local resolved_dir
@@ -37,6 +41,11 @@ validate_environment() {
 
     if is_unsafe_agents_dir; then
         printf "ERROR: AGENTS_DIR is unsafe: '%s'\n" "${AGENTS_DIR}" >&2
+        return 1
+    fi
+
+    if ! command -v rsync >/dev/null 2>&1; then
+        printf "ERROR: rsync is required to materialize Codex agent definitions; install rsync and retry.\n" >&2
         return 1
     fi
 
@@ -71,72 +80,40 @@ find_agent_source() {
     return 1
 }
 
-is_repo_managed_agent() {
-    local agent_name="${1}"
-    local source_agents="${2}"
+is_recognized_legacy_agent_link() {
+    local link_target="${1}"
+    local agent_name="${2}"
+    local expected_source="${3}"
 
-    printf '%s\n' "${source_agents}" | grep -qxF "${agent_name}"
-}
-
-remove_repo_managed_agents() {
-    local removed_count=0
-    local preserved_count=0
-    local source_agents
-    source_agents="$(list_repo_agents)"
-
-    if is_unsafe_agents_dir; then
-        printf "ERROR: AGENTS_DIR is unsafe: '%s'\n" "${AGENTS_DIR}" >&2
-        return 1
-    fi
-
-    if [ ! -d "${AGENTS_DIR}" ]; then
+    if [ "${link_target}" = "${expected_source}" ]; then
         return 0
     fi
 
-    printf "Scanning existing agents...\n"
-
-    for agent_file in "${AGENTS_DIR%/}"/*.toml; do
-        local agent_name
-        local expected_source
-
-        if [ ! -e "${agent_file}" ] && [ ! -L "${agent_file}" ]; then
-            continue
-        fi
-
-        agent_name="$(basename "${agent_file}")"
-
-        if ! is_repo_managed_agent "${agent_name}" "${source_agents}"; then
-            printf "  Preserving user agent: %s\n" "${agent_name}"
-            preserved_count=$((preserved_count + 1))
-            continue
-        fi
-
-        if [ ! -L "${agent_file}" ]; then
-            printf "  Preserving existing non-symlink path: %s\n" "${agent_name}"
-            preserved_count=$((preserved_count + 1))
-            continue
-        fi
-
-        expected_source="$(find_agent_source "${agent_name}")"
-        if [ "${FORCE}" != "1" ] && [ -e "${agent_file}" ] && [ "${agent_file}" -ef "${expected_source}" ]; then
-            printf "  Keeping existing symlink: %s\n" "${agent_name}"
-            preserved_count=$((preserved_count + 1))
-            continue
-        fi
-
-        printf "  Removing repo agent: %s\n" "${agent_name}"
-        if ! rm -f "${agent_file}"; then
-            printf "ERROR: failed to remove agent: %s\n" "${agent_name}" >&2
-            return 1
-        fi
-        removed_count=$((removed_count + 1))
-    done
-
-    printf "Removed %d repo agent(s), preserved %d existing agent(s)\n" "${removed_count}" "${preserved_count}"
-    return 0
+    case "${link_target}" in
+        */codex/agents/*/"${agent_name}" | */codex/agents/"${agent_name}" | */agents/codex/*/"${agent_name}")
+            return 0
+            ;;
+    esac
+    return 1
 }
 
-symlink_repo_agents() {
+materialize_agent() {
+    local source_file="${1}"
+    local target_file="${2}"
+    local temporary_file
+
+    if ! temporary_file="$(mktemp "${target_file}.tmp.XXXXXX")"; then
+        printf "ERROR: failed to create temporary agent file: %s\n" "${target_file}" >&2
+        return 1
+    fi
+    if ! rsync -a "${source_file}" "${temporary_file}" || ! mv -f "${temporary_file}" "${target_file}"; then
+        rm -f "${temporary_file}"
+        printf "ERROR: failed to materialize agent: %s\n" "$(basename "${source_file}")" >&2
+        return 1
+    fi
+}
+
+install_repo_agents() {
     local installed_count=0
     local skipped_count=0
     local source_file
@@ -150,24 +127,37 @@ symlink_repo_agents() {
 
     while IFS= read -r source_file; do
         local agent_name
-        local target_link
+        local target_file
+        local managed_path
+        local link_target
         agent_name="$(basename "${source_file}")"
-        target_link="${AGENTS_DIR%/}/${agent_name}"
+        target_file="${AGENTS_DIR%/}/${agent_name}"
+        managed_path="agents/${agent_name}"
 
-        if [ -L "${target_link}" ]; then
-            printf "  Already installed (symlink exists): %s\n" "${agent_name}"
-            skipped_count=$((skipped_count + 1))
-            continue
-        fi
-
-        if [ -e "${target_link}" ]; then
+        if [ -L "${target_file}" ]; then
+            if ! link_target="$(readlink "${target_file}")"; then
+                printf "ERROR: failed to read agent link: %s\n" "${target_file}" >&2
+                return 1
+            fi
+            if ! is_recognized_legacy_agent_link "${link_target}" "${agent_name}" "${source_file}"; then
+                printf "  Preserving unrelated symlink: %s\n" "${agent_name}"
+                skipped_count=$((skipped_count + 1))
+                continue
+            fi
+            if ! rm -f "${target_file}"; then
+                printf "ERROR: failed to remove legacy agent link: %s\n" "${agent_name}" >&2
+                return 1
+            fi
+        elif [ -e "${target_file}" ] && ! managed_state_is_managed "${managed_path}"; then
             printf "  Skipping existing non-symlink path: %s\n" "${agent_name}"
             skipped_count=$((skipped_count + 1))
             continue
         fi
 
-        if ! ln -s "${source_file}" "${target_link}"; then
-            printf "ERROR: failed to install agent: %s\n" "${agent_name}" >&2
+        if ! materialize_agent "${source_file}" "${target_file}"; then
+            return 1
+        fi
+        if ! managed_state_mark "${managed_path}"; then
             return 1
         fi
         printf "  Installed: %s\n" "${agent_name}"
@@ -191,12 +181,7 @@ install_agents() {
         fi
     fi
 
-    if ! remove_repo_managed_agents; then
-        printf "ERROR: failed to remove repo agents\n" >&2
-        return 1
-    fi
-
-    if ! symlink_repo_agents; then
+    if ! install_repo_agents; then
         printf "ERROR: failed to install repo agents\n" >&2
         return 1
     fi

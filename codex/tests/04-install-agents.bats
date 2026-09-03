@@ -8,7 +8,8 @@ setup() {
     TEST_TMP="$(mktemp -d)"
     export TEST_TMP
     export AGENT_SOURCE="${TEST_TMP}/agents"
-    export AGENTS_DIR="${TEST_TMP}/codex-agents/"
+    export CODEX_HOME="${TEST_TMP}/codex-home"
+    export AGENTS_DIR="${CODEX_HOME}/agents/"
     export FORCE=0
 }
 
@@ -53,7 +54,8 @@ make_agent() {
         "${AGENT_INSTALLER}"
 
     [ "$status" -eq 0 ]
-    [ -L "${codex_home}/agents/reviewer.toml" ]
+    [ -f "${codex_home}/agents/reviewer.toml" ]
+    [ ! -L "${codex_home}/agents/reviewer.toml" ]
     [ ! -e "${TEST_TMP}/home/.codex/agents/reviewer.toml" ]
 }
 
@@ -65,10 +67,11 @@ make_agent() {
         HOME="${test_home}" "${AGENT_INSTALLER}"
 
     [ "$status" -eq 0 ]
-    [ -L "${test_home}/.codex/agents/reviewer.toml" ]
+    [ -f "${test_home}/.codex/agents/reviewer.toml" ]
+    [ ! -L "${test_home}/.codex/agents/reviewer.toml" ]
 }
 
-@test "installer recursively discovers TOML files and installs them flat by basename" {
+@test "installer recursively discovers TOML files and materializes them flat by basename" {
     make_agent "general/reviewer.toml"
     make_agent "languages/go_engineer.toml"
     mkdir -p "${AGENT_SOURCE}/ignored"
@@ -77,12 +80,11 @@ make_agent() {
     run "${AGENT_INSTALLER}"
 
     [ "$status" -eq 0 ]
-    [ -L "${AGENTS_DIR}/reviewer.toml" ]
-    [ -L "${AGENTS_DIR}/go_engineer.toml" ]
-    [ "$(readlink "${AGENTS_DIR}/reviewer.toml")" = \
-        "${AGENT_SOURCE}/general/reviewer.toml" ]
-    [ "$(readlink "${AGENTS_DIR}/go_engineer.toml")" = \
-        "${AGENT_SOURCE}/languages/go_engineer.toml" ]
+    [ -f "${AGENTS_DIR}/reviewer.toml" ]
+    [ -f "${AGENTS_DIR}/go_engineer.toml" ]
+    [ ! -L "${AGENTS_DIR}/reviewer.toml" ]
+    [ ! -L "${AGENTS_DIR}/go_engineer.toml" ]
+    [ "$(cat "${AGENTS_DIR}/reviewer.toml")" = 'name = "reviewer"' ]
     [ ! -e "${AGENTS_DIR}/general" ]
     [ ! -e "${AGENTS_DIR}/notes.md" ]
     [[ "$output" == *"Installed 2 repo agent(s)"* ]]
@@ -110,7 +112,7 @@ make_agent() {
     [[ "$output" == *"AGENTS_DIR is unsafe"* ]]
 }
 
-@test "fresh installation creates the target directory and agent symlinks" {
+@test "fresh installation creates regular, source-independent agent files" {
     make_agent "general/reviewer.toml"
     [ ! -e "${AGENTS_DIR}" ]
 
@@ -118,59 +120,56 @@ make_agent() {
 
     [ "$status" -eq 0 ]
     [ -d "${AGENTS_DIR}" ]
-    [ -L "${AGENTS_DIR}/reviewer.toml" ]
+    [ -f "${AGENTS_DIR}/reviewer.toml" ]
+    [ ! -L "${AGENTS_DIR}/reviewer.toml" ]
+    rm -rf "${AGENT_SOURCE}"
+    [ "$(cat "${AGENTS_DIR}/reviewer.toml")" = 'name = "reviewer"' ]
     [[ "$output" == *"Creating agents directory"* ]]
     [[ "$output" == *"Installed: reviewer.toml"* ]]
 }
 
-@test "FORCE=0 keeps correct links during an idempotent reinstall" {
+@test "managed files are refreshed during an idempotent reinstall" {
     make_agent "general/reviewer.toml"
     "${AGENT_INSTALLER}" >/dev/null
+    printf 'name = "new-reviewer"\n' > "${AGENT_SOURCE}/general/reviewer.toml"
 
     run "${AGENT_INSTALLER}"
 
     [ "$status" -eq 0 ]
-    [ -L "${AGENTS_DIR}/reviewer.toml" ]
-    [ "$(readlink "${AGENTS_DIR}/reviewer.toml")" = \
-        "${AGENT_SOURCE}/general/reviewer.toml" ]
-    [[ "$output" == *"Keeping existing symlink: reviewer.toml"* ]]
-    [[ "$output" == *"Already installed (symlink exists): reviewer.toml"* ]]
-    [[ "$output" != *"Removing repo agent: reviewer.toml"* ]]
+    [ ! -L "${AGENTS_DIR}/reviewer.toml" ]
+    [ "$(cat "${AGENTS_DIR}/reviewer.toml")" = 'name = "new-reviewer"' ]
 }
 
-@test "FORCE=1 refreshes repo-managed links" {
+@test "FORCE=1 refreshes manifest-owned files" {
     make_agent "general/reviewer.toml"
     "${AGENT_INSTALLER}" >/dev/null
+    printf 'name = "forced-reviewer"\n' > "${AGENT_SOURCE}/general/reviewer.toml"
 
     run env AGENT_SOURCE="${AGENT_SOURCE}" AGENTS_DIR="${AGENTS_DIR}" FORCE=1 \
         "${AGENT_INSTALLER}"
 
     [ "$status" -eq 0 ]
-    [ -L "${AGENTS_DIR}/reviewer.toml" ]
-    [ "$(readlink "${AGENTS_DIR}/reviewer.toml")" = \
-        "${AGENT_SOURCE}/general/reviewer.toml" ]
-    [[ "$output" == *"Removing repo agent: reviewer.toml"* ]]
-    [[ "$output" == *"Installed: reviewer.toml"* ]]
+    [ ! -L "${AGENTS_DIR}/reviewer.toml" ]
+    [ "$(cat "${AGENTS_DIR}/reviewer.toml")" = 'name = "forced-reviewer"' ]
 }
 
-@test "stale and broken repo-managed links are replaced" {
+@test "recognized current and legacy repository links migrate to regular files" {
     make_agent "general/reviewer.toml"
     make_agent "general/writer.toml"
     mkdir -p "${AGENTS_DIR}" "${TEST_TMP}/old-agents"
-    printf 'old\n' > "${TEST_TMP}/old-agents/reviewer.toml"
-    ln -s "${TEST_TMP}/old-agents/reviewer.toml" \
+    mkdir -p "${TEST_TMP}/old/codex/agents/general"
+    printf 'old\n' > "${TEST_TMP}/old/codex/agents/general/reviewer.toml"
+    ln -s "${TEST_TMP}/old/codex/agents/general/reviewer.toml" \
         "${AGENTS_DIR}/reviewer.toml"
-    ln -s "${TEST_TMP}/missing/writer.toml" "${AGENTS_DIR}/writer.toml"
+    ln -s "${AGENT_SOURCE}/general/writer.toml" "${AGENTS_DIR}/writer.toml"
 
     run "${AGENT_INSTALLER}"
 
     [ "$status" -eq 0 ]
-    [ "$(readlink "${AGENTS_DIR}/reviewer.toml")" = \
-        "${AGENT_SOURCE}/general/reviewer.toml" ]
-    [ "$(readlink "${AGENTS_DIR}/writer.toml")" = \
-        "${AGENT_SOURCE}/general/writer.toml" ]
-    [[ "$output" == *"Removing repo agent: reviewer.toml"* ]]
-    [[ "$output" == *"Removing repo agent: writer.toml"* ]]
+    [ ! -L "${AGENTS_DIR}/reviewer.toml" ]
+    [ ! -L "${AGENTS_DIR}/writer.toml" ]
+    [ "$(cat "${AGENTS_DIR}/reviewer.toml")" = 'name = "reviewer"' ]
+    [ "$(cat "${AGENTS_DIR}/writer.toml")" = 'name = "writer"' ]
 }
 
 @test "unrelated user TOML files and symlinks are preserved" {
@@ -189,8 +188,6 @@ make_agent() {
     [ -L "${AGENTS_DIR}/external.toml" ]
     [ "$(readlink "${AGENTS_DIR}/external.toml")" = \
         "${TEST_TMP}/user-source/external.toml" ]
-    [[ "$output" == *"Preserving user agent: personal.toml"* ]]
-    [[ "$output" == *"Preserving user agent: external.toml"* ]]
 }
 
 @test "existing non-symlink path with a managed basename is preserved and skipped" {
@@ -204,25 +201,40 @@ make_agent() {
     [ -f "${AGENTS_DIR}/reviewer.toml" ]
     [ ! -L "${AGENTS_DIR}/reviewer.toml" ]
     [ "$(cat "${AGENTS_DIR}/reviewer.toml")" = "local override" ]
-    [[ "$output" == *"Preserving existing non-symlink path: reviewer.toml"* ]]
     [[ "$output" == *"Skipping existing non-symlink path: reviewer.toml"* ]]
 }
 
-@test "link creation failure returns nonzero and does not report the agent installed" {
+@test "rsync failure returns nonzero and does not record the agent as managed" {
     local fake_bin="${TEST_TMP}/fake-bin"
     make_agent "general/reviewer.toml"
     mkdir -p "${AGENTS_DIR}" "${fake_bin}"
-    printf '#!/usr/bin/env bash\nexit 73\n' > "${fake_bin}/ln"
-    chmod +x "${fake_bin}/ln"
+    printf '#!/usr/bin/env bash\nexit 73\n' > "${fake_bin}/rsync"
+    chmod +x "${fake_bin}/rsync"
 
     run env AGENT_SOURCE="${AGENT_SOURCE}" AGENTS_DIR="${AGENTS_DIR}" \
         PATH="${fake_bin}:${PATH}" "${AGENT_INSTALLER}"
 
     [ "$status" -ne 0 ]
-    [[ "$output" == *"failed to install agent: reviewer.toml"* ]]
+    [[ "$output" == *"failed to materialize agent: reviewer.toml"* ]]
     [[ "$output" == *"failed to install repo agents"* ]]
     [[ "$output" != *"Installed: reviewer.toml"* ]]
     [ ! -e "${AGENTS_DIR}/reviewer.toml" ]
+    [ ! -e "${CODEX_HOME}/.mnemonic-agents-skills/managed-paths" ]
+}
+
+@test "installer reports an actionable error when rsync is unavailable" {
+    local no_rsync_bin="${TEST_TMP}/no-rsync-bin"
+    local utility
+    make_agent "general/reviewer.toml"
+    mkdir -p "${no_rsync_bin}"
+    for utility in bash dirname find sort basename mkdir mktemp rm mv grep cat; do
+        ln -s "$(command -v "${utility}")" "${no_rsync_bin}/${utility}"
+    done
+    run env AGENT_SOURCE="${AGENT_SOURCE}" AGENTS_DIR="${AGENTS_DIR}" CODEX_HOME="${CODEX_HOME}" \
+        PATH="${no_rsync_bin}" "${AGENT_INSTALLER}"
+
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"rsync is required"* ]]
 }
 
 make_entrypoint_fixture() {
