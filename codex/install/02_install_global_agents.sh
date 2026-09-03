@@ -13,6 +13,9 @@ FORCE="${FORCE:-0}"
 # shellcheck source=../../lib/print.sh disable=SC1091
 . "${PROJ_ROOT}/lib/print.sh"
 
+# shellcheck source=lib/managed_state.sh disable=SC1091
+. "${SCRIPTS}/lib/managed_state.sh"
+
 is_unsafe_codex_home() {
     local resolved_home
 
@@ -42,13 +45,18 @@ is_unsafe_codex_home() {
 }
 
 validate_environment() {
-    if [ ! -f "${GLOBAL_AGENTS_SOURCE}" ] || [ ! -s "${GLOBAL_AGENTS_SOURCE}" ]; then
+    if [ ! -f "${GLOBAL_AGENTS_SOURCE}" ] || [ -L "${GLOBAL_AGENTS_SOURCE}" ] || [ ! -s "${GLOBAL_AGENTS_SOURCE}" ]; then
         print::error "global agent rules source must be a nonempty regular file: ${GLOBAL_AGENTS_SOURCE}"
         return 1
     fi
 
     if is_unsafe_codex_home; then
         print::error "CODEX_HOME is unsafe: '${CODEX_HOME}'"
+        return 1
+    fi
+
+    if ! command -v rsync >/dev/null 2>&1; then
+        print::error "rsync is required to materialize Codex global rules; install rsync and retry."
         return 1
     fi
 
@@ -96,32 +104,32 @@ warn_about_override() {
     fi
 }
 
-replace_link() {
-    local expected_source="${1}"
+materialize_global_rules() {
+    local temporary_file
 
-    if ! rm "${GLOBAL_AGENTS_TARGET}"; then
-        print::error "failed to remove existing global agent rules link: ${GLOBAL_AGENTS_TARGET}"
+    if ! temporary_file="$(mktemp "${GLOBAL_AGENTS_TARGET}.tmp.XXXXXX")"; then
+        print::error "failed to create temporary global agent rules file: ${GLOBAL_AGENTS_TARGET}"
         return 1
     fi
 
-    if ! ln -s "${expected_source}" "${GLOBAL_AGENTS_TARGET}"; then
-        print::error "failed to install global agent rules link: ${GLOBAL_AGENTS_TARGET}"
+    if ! rsync -a "${GLOBAL_AGENTS_SOURCE}" "${temporary_file}" || ! mv -f "${temporary_file}" "${GLOBAL_AGENTS_TARGET}"; then
+        rm -f "${temporary_file}"
+        print::error "failed to materialize global agent rules: ${GLOBAL_AGENTS_TARGET}"
         return 1
     fi
 
-    print::success "Installed global agent rules: ${GLOBAL_AGENTS_TARGET} -> ${expected_source}"
+    if ! managed_state_mark "AGENTS.md"; then
+        return 1
+    fi
+
+    print::success "Installed global agent rules: ${GLOBAL_AGENTS_TARGET}"
     return 0
 }
 
 install_global_agent_rules() {
-    local expected_source
     local link_target
 
     if ! validate_environment; then
-        return 1
-    fi
-
-    if ! expected_source="$(absolute_source_path)"; then
         return 1
     fi
 
@@ -141,36 +149,21 @@ install_global_agent_rules() {
             return 1
         fi
 
-        if [ "${link_target}" = "${expected_source}" ]; then
-            print::info "Global agent rules already installed: ${GLOBAL_AGENTS_TARGET}"
-            return 0
-        fi
-
-        # FORCE refreshes symlinks only. Regular files and directories remain
-        # user-owned even when FORCE=1, matching the conservative agent installer.
-        if is_repo_managed_link "${link_target}" "${expected_source}" || [ "${FORCE}" = "1" ]; then
-            if ! replace_link "${expected_source}"; then
+        if is_repo_managed_link "${link_target}" "$(absolute_source_path)"; then
+            if ! rm -f "${GLOBAL_AGENTS_TARGET}"; then
+                print::error "failed to remove legacy global agent rules link: ${GLOBAL_AGENTS_TARGET}"
                 return 1
             fi
+        else
+            print::warning "Preserving unrelated symlink: ${GLOBAL_AGENTS_TARGET} -> ${link_target}"
             return 0
         fi
-
-        print::warning "Preserving unrelated symlink: ${GLOBAL_AGENTS_TARGET} -> ${link_target}"
-        return 0
-    fi
-
-    if [ -e "${GLOBAL_AGENTS_TARGET}" ]; then
+    elif [ -e "${GLOBAL_AGENTS_TARGET}" ] && { [ ! -f "${GLOBAL_AGENTS_TARGET}" ] || ! managed_state_is_managed "AGENTS.md"; }; then
         print::warning "Preserving existing non-symlink path: ${GLOBAL_AGENTS_TARGET}"
         return 0
     fi
 
-    if ! ln -s "${expected_source}" "${GLOBAL_AGENTS_TARGET}"; then
-        print::error "failed to install global agent rules link: ${GLOBAL_AGENTS_TARGET}"
-        return 1
-    fi
-
-    print::success "Installed global agent rules: ${GLOBAL_AGENTS_TARGET} -> ${expected_source}"
-    return 0
+    materialize_global_rules
 }
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then

@@ -59,6 +59,32 @@ make_fake_command() {
     [ ! -e "${CODEX_HOME}" ]
 }
 
+@test "symlinked global rules source fails without creating CODEX_HOME" {
+    local source_file="${TEST_TMP}/source.md"
+    printf 'rules\n' > "${source_file}"
+    rm -f "${GLOBAL_AGENTS_SOURCE}"
+    ln -s "${source_file}" "${GLOBAL_AGENTS_SOURCE}"
+
+    run "${INSTALLER}"
+
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"global agent rules source must be a nonempty regular file"* ]]
+    [ ! -e "${CODEX_HOME}" ]
+}
+
+@test "installer reports an actionable error when rsync is unavailable" {
+    local no_rsync_bin="${TEST_TMP}/no-rsync-bin"
+    mkdir -p "${no_rsync_bin}"
+    ln -s "$(command -v bash)" "${no_rsync_bin}/bash"
+    ln -s "$(command -v dirname)" "${no_rsync_bin}/dirname"
+
+    run env PATH="${no_rsync_bin}" "${INSTALLER}"
+
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"rsync is required"* ]]
+    [ ! -e "${CODEX_HOME}" ]
+}
+
 @test "default CODEX_HOME is HOME/.codex" {
     local test_home="${TEST_TMP}/home"
 
@@ -66,16 +92,17 @@ make_fake_command() {
         GLOBAL_AGENTS_SOURCE="${GLOBAL_AGENTS_SOURCE}" "${INSTALLER}"
 
     [ "$status" -eq 0 ]
-    [ -L "${test_home}/.codex/AGENTS.md" ]
-    [ "$(readlink "${test_home}/.codex/AGENTS.md")" = \
-        "$(cd "$(dirname "${GLOBAL_AGENTS_SOURCE}")" && pwd -P)/$(basename "${GLOBAL_AGENTS_SOURCE}")" ]
+    [ -f "${test_home}/.codex/AGENTS.md" ]
+    [ ! -L "${test_home}/.codex/AGENTS.md" ]
+    [ "$(cat "${test_home}/.codex/AGENTS.md")" = "# Test global rules" ]
 }
 
 @test "CODEX_HOME override is honored" {
     run "${INSTALLER}"
 
     [ "$status" -eq 0 ]
-    [ -L "${CODEX_HOME}/AGENTS.md" ]
+    [ -f "${CODEX_HOME}/AGENTS.md" ]
+    [ ! -L "${CODEX_HOME}/AGENTS.md" ]
 }
 
 @test "empty CODEX_HOME is rejected by the install function" {
@@ -126,39 +153,34 @@ make_fake_command() {
     [ ! -e "${root_link}/AGENTS.md" ]
 }
 
-@test "fresh install creates CODEX_HOME and an absolute source symlink" {
-    local expected_source
-    expected_source="$(cd "$(dirname "${GLOBAL_AGENTS_SOURCE}")" && pwd -P)/$(basename "${GLOBAL_AGENTS_SOURCE}")"
-
+@test "fresh install creates source-independent regular global rules" {
     run "${INSTALLER}"
 
     [ "$status" -eq 0 ]
     [ -d "${CODEX_HOME}" ]
-    [ -L "${CODEX_HOME}/AGENTS.md" ]
-    [ "$(readlink "${CODEX_HOME}/AGENTS.md")" = "${expected_source}" ]
-    [[ "$(readlink "${CODEX_HOME}/AGENTS.md")" == /* ]]
+    [ -f "${CODEX_HOME}/AGENTS.md" ]
+    [ ! -L "${CODEX_HOME}/AGENTS.md" ]
+    rm -f "${GLOBAL_AGENTS_SOURCE}"
+    [ "$(cat "${CODEX_HOME}/AGENTS.md")" = "# Test global rules" ]
     [[ "$output" == *"Installed global agent rules"* ]]
 }
 
-@test "correct source symlink is idempotent" {
+@test "manifest-owned global rules are refreshed during an idempotent reinstall" {
     "${INSTALLER}" >/dev/null
-    local before
-    before="$(readlink "${CODEX_HOME}/AGENTS.md")"
+    printf '# Updated global rules\n' > "${GLOBAL_AGENTS_SOURCE}"
 
     run "${INSTALLER}"
 
     [ "$status" -eq 0 ]
-    [ "$(readlink "${CODEX_HOME}/AGENTS.md")" = "${before}" ]
-    [[ "$output" == *"Global agent rules already installed"* ]]
-    [[ "$output" != *"Installed global agent rules"* ]]
+    [ ! -L "${CODEX_HOME}/AGENTS.md" ]
+    [ "$(cat "${CODEX_HOME}/AGENTS.md")" = "# Updated global rules" ]
+    [[ "$output" == *"Installed global agent rules"* ]]
 }
 
 @test "stale and broken repo-managed links are replaced" {
     local stale_home="${TEST_TMP}/stale-home"
     local broken_home="${TEST_TMP}/broken-home"
     local legacy_home="${TEST_TMP}/legacy-home"
-    local expected_source
-    expected_source="$(cd "$(dirname "${GLOBAL_AGENTS_SOURCE}")" && pwd -P)/$(basename "${GLOBAL_AGENTS_SOURCE}")"
     mkdir -p "${stale_home}" "${broken_home}" "${legacy_home}" \
         "${TEST_TMP}/old/codex/agents" "${TEST_TMP}/old/agents/codex"
     printf 'old rules\n' > "${TEST_TMP}/old/codex/agents/global-agents.md"
@@ -170,17 +192,21 @@ make_fake_command() {
     run env CODEX_HOME="${stale_home}" \
         GLOBAL_AGENTS_SOURCE="${GLOBAL_AGENTS_SOURCE}" "${INSTALLER}"
     [ "$status" -eq 0 ]
-    [ "$(readlink "${stale_home}/AGENTS.md")" = "${expected_source}" ]
+    [ -f "${stale_home}/AGENTS.md" ]
+    [ ! -L "${stale_home}/AGENTS.md" ]
+    [ "$(cat "${stale_home}/AGENTS.md")" = "# Test global rules" ]
 
     run env CODEX_HOME="${broken_home}" \
         GLOBAL_AGENTS_SOURCE="${GLOBAL_AGENTS_SOURCE}" "${INSTALLER}"
     [ "$status" -eq 0 ]
-    [ "$(readlink "${broken_home}/AGENTS.md")" = "${expected_source}" ]
+    [ -f "${broken_home}/AGENTS.md" ]
+    [ ! -L "${broken_home}/AGENTS.md" ]
 
     run env CODEX_HOME="${legacy_home}" \
         GLOBAL_AGENTS_SOURCE="${GLOBAL_AGENTS_SOURCE}" "${INSTALLER}"
     [ "$status" -eq 0 ]
-    [ "$(readlink "${legacy_home}/AGENTS.md")" = "${expected_source}" ]
+    [ -f "${legacy_home}/AGENTS.md" ]
+    [ ! -L "${legacy_home}/AGENTS.md" ]
 }
 
 @test "regular file is preserved for FORCE=0 and FORCE=1" {
@@ -226,10 +252,8 @@ make_fake_command() {
     [[ "$output" == *"Preserving unrelated symlink"* ]]
 }
 
-@test "FORCE=1 replaces an unrelated symlink" {
+@test "unrelated symlink is preserved with FORCE=1" {
     local user_source="${TEST_TMP}/user-rules.md"
-    local expected_source
-    expected_source="$(cd "$(dirname "${GLOBAL_AGENTS_SOURCE}")" && pwd -P)/$(basename "${GLOBAL_AGENTS_SOURCE}")"
     mkdir -p "${CODEX_HOME}"
     printf 'user rules\n' > "${user_source}"
     ln -s "${user_source}" "${CODEX_HOME}/AGENTS.md"
@@ -238,8 +262,8 @@ make_fake_command() {
         GLOBAL_AGENTS_SOURCE="${GLOBAL_AGENTS_SOURCE}" "${INSTALLER}"
 
     [ "$status" -eq 0 ]
-    [ "$(readlink "${CODEX_HOME}/AGENTS.md")" = "${expected_source}" ]
-    [[ "$output" == *"Installed global agent rules"* ]]
+    [ "$(readlink "${CODEX_HOME}/AGENTS.md")" = "${user_source}" ]
+    [[ "$output" == *"Preserving unrelated symlink"* ]]
 }
 
 @test "nonempty override warns and remains unchanged" {
@@ -275,17 +299,18 @@ make_fake_command() {
     [[ "$output" != *"Installed global agent rules"* ]]
 }
 
-@test "ln failure propagates and never reports Installed" {
+@test "rsync failure propagates and never records global rules as managed" {
     local fake_bin
-    fake_bin="$(make_fake_command ln 72)"
+    fake_bin="$(make_fake_command rsync 72)"
     mkdir -p "${CODEX_HOME}"
 
     run env PATH="${fake_bin}:${PATH}" "${INSTALLER}"
 
     [ "$status" -ne 0 ]
-    [[ "$output" == *"failed to install global agent rules link"* ]]
+    [[ "$output" == *"failed to materialize global agent rules"* ]]
     [[ "$output" != *"Installed global agent rules"* ]]
     [ ! -e "${CODEX_HOME}/AGENTS.md" ]
+    [ ! -e "${CODEX_HOME}/.mnemonic-agents-skills/managed-paths" ]
 }
 
 @test "rm failure propagates and never reports Installed" {
@@ -297,7 +322,7 @@ make_fake_command() {
     run env PATH="${fake_bin}:${PATH}" "${INSTALLER}"
 
     [ "$status" -ne 0 ]
-    [[ "$output" == *"failed to remove existing global agent rules link"* ]]
+    [[ "$output" == *"failed to remove legacy global agent rules link"* ]]
     [[ "$output" != *"Installed global agent rules"* ]]
     [ -L "${CODEX_HOME}/AGENTS.md" ]
 }
