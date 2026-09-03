@@ -94,7 +94,7 @@ model also couples a working installation to the checkout's absolute location.
   - Verify: `bats codex/tests/02-install-global-agent-rules.bats`
   - Done: The global-rules test suite exits 0 and verifies that installer-managed `AGENTS.md` is a regular file with the expected content.
 
-- [ ] **Cycle 4 - Document and validate copy-based installation**: Update Codex installation guidance and run the complete Codex validation suite.
+- [x] **Cycle 4 - Document and validate copy-based installation**: Update Codex installation guidance and run the complete Codex validation suite.
   - Agent: `technical_writer`
   - Files: `codex/README.md`, `CHANGELOG.md`
   - Steps:

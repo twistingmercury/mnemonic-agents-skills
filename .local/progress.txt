@@ -6,3 +6,6 @@ Completed manifest-owned rsync materialization for Codex skill directories, incl
 
 2026-09-03 — Cycle 3 - Materialize global Codex rules
 Completed manifest-owned atomic rsync materialization for `AGENTS.md`, including source independence, managed refresh, user-path preservation, recognized legacy-link migration, and retained override warnings. Verified with `bats codex/tests/02-install-global-agent-rules.bats`, `shellcheck codex/install/02_install_global_agents.sh codex/install/lib/managed_state.sh`, and `git diff --check`. Follow-up: Cycle 4 will update documentation and run the complete Codex suite.
+
+2026-09-03 — Cycle 4 - Document and validate copy-based installation
+Updated Codex installation and troubleshooting guidance for manifest-owned materialization, including the `rsync` prerequisite, `FORCE=1` protections, legacy-link migration, user-content preservation, and Codex restart requirement. Added an unreleased changelog entry for the compatibility fix. Verified with `make test-codex` (68 passing BATS tests) and `git diff --check`. Follow-up: No unchecked cycles remain.
