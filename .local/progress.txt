@@ -1,0 +1,2 @@
+2026-09-03 — Cycle 1 - Materialize managed agent definitions
+Completed manifest-owned, atomic rsync materialization for flattened Codex agent TOMLs, including source independence, managed refresh, untracked-path preservation, and recognized legacy-link migration. Verified with `bats codex/tests/04-install-agents.bats`, `shellcheck codex/install/01_install_agents.sh codex/install/lib/managed_state.sh`, and `git diff --check`. Follow-up: Cycle 2 will use the shared manifest helpers for skills.
