@@ -10,7 +10,6 @@ setup() {
     export AGENT_SOURCE="${TEST_TMP}/agents"
     export CODEX_HOME="${TEST_TMP}/codex-home"
     export AGENTS_DIR="${CODEX_HOME}/agents/"
-    export FORCE=0
 }
 
 teardown() {
@@ -138,19 +137,6 @@ make_agent() {
     [ "$status" -eq 0 ]
     [ ! -L "${AGENTS_DIR}/reviewer.toml" ]
     [ "$(cat "${AGENTS_DIR}/reviewer.toml")" = 'name = "new-reviewer"' ]
-}
-
-@test "FORCE=1 refreshes manifest-owned files" {
-    make_agent "general/reviewer.toml"
-    "${AGENT_INSTALLER}" >/dev/null
-    printf 'name = "forced-reviewer"\n' > "${AGENT_SOURCE}/general/reviewer.toml"
-
-    run env AGENT_SOURCE="${AGENT_SOURCE}" AGENTS_DIR="${AGENTS_DIR}" FORCE=1 \
-        "${AGENT_INSTALLER}"
-
-    [ "$status" -eq 0 ]
-    [ ! -L "${AGENTS_DIR}/reviewer.toml" ]
-    [ "$(cat "${AGENTS_DIR}/reviewer.toml")" = 'name = "forced-reviewer"' ]
 }
 
 @test "recognized current and legacy repository links migrate to regular files" {

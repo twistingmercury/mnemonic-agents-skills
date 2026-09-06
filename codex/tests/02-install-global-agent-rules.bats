@@ -9,7 +9,6 @@ setup() {
     export TEST_TMP
     export CODEX_HOME="${TEST_TMP}/codex-home"
     export GLOBAL_AGENTS_SOURCE="${TEST_TMP}/global-agents.md"
-    export FORCE=0
     printf '# Test global rules\n' > "${GLOBAL_AGENTS_SOURCE}"
 }
 
@@ -209,57 +208,37 @@ make_fake_command() {
     [ ! -L "${legacy_home}/AGENTS.md" ]
 }
 
-@test "regular file is preserved for FORCE=0 and FORCE=1" {
-    local force_value
+@test "regular file is preserved" {
     mkdir -p "${CODEX_HOME}"
     printf 'user rules\n' > "${CODEX_HOME}/AGENTS.md"
 
-    for force_value in 0 1; do
-        run env FORCE="${force_value}" CODEX_HOME="${CODEX_HOME}" \
-            GLOBAL_AGENTS_SOURCE="${GLOBAL_AGENTS_SOURCE}" "${INSTALLER}"
-        [ "$status" -eq 0 ]
-        [ "$(cat "${CODEX_HOME}/AGENTS.md")" = "user rules" ]
-        [ ! -L "${CODEX_HOME}/AGENTS.md" ]
-        [[ "$output" == *"Preserving existing non-symlink path"* ]]
-    done
+    run "${INSTALLER}"
+
+    [ "$status" -eq 0 ]
+    [ "$(cat "${CODEX_HOME}/AGENTS.md")" = "user rules" ]
+    [ ! -L "${CODEX_HOME}/AGENTS.md" ]
+    [[ "$output" == *"Preserving existing non-symlink path"* ]]
 }
 
-@test "directory is preserved for FORCE=0 and FORCE=1" {
-    local force_value
+@test "directory is preserved" {
     mkdir -p "${CODEX_HOME}/AGENTS.md"
     printf 'marker\n' > "${CODEX_HOME}/AGENTS.md/user-file"
 
-    for force_value in 0 1; do
-        run env FORCE="${force_value}" CODEX_HOME="${CODEX_HOME}" \
-            GLOBAL_AGENTS_SOURCE="${GLOBAL_AGENTS_SOURCE}" "${INSTALLER}"
-        [ "$status" -eq 0 ]
-        [ -d "${CODEX_HOME}/AGENTS.md" ]
-        [ "$(cat "${CODEX_HOME}/AGENTS.md/user-file")" = "marker" ]
-        [[ "$output" == *"Preserving existing non-symlink path"* ]]
-    done
+    run "${INSTALLER}"
+
+    [ "$status" -eq 0 ]
+    [ -d "${CODEX_HOME}/AGENTS.md" ]
+    [ "$(cat "${CODEX_HOME}/AGENTS.md/user-file")" = "marker" ]
+    [[ "$output" == *"Preserving existing non-symlink path"* ]]
 }
 
-@test "unrelated symlink is preserved by default" {
+@test "unrelated symlink is preserved" {
     local user_source="${TEST_TMP}/user-rules.md"
     mkdir -p "${CODEX_HOME}"
     printf 'user rules\n' > "${user_source}"
     ln -s "${user_source}" "${CODEX_HOME}/AGENTS.md"
 
     run "${INSTALLER}"
-
-    [ "$status" -eq 0 ]
-    [ "$(readlink "${CODEX_HOME}/AGENTS.md")" = "${user_source}" ]
-    [[ "$output" == *"Preserving unrelated symlink"* ]]
-}
-
-@test "unrelated symlink is preserved with FORCE=1" {
-    local user_source="${TEST_TMP}/user-rules.md"
-    mkdir -p "${CODEX_HOME}"
-    printf 'user rules\n' > "${user_source}"
-    ln -s "${user_source}" "${CODEX_HOME}/AGENTS.md"
-
-    run env FORCE=1 CODEX_HOME="${CODEX_HOME}" \
-        GLOBAL_AGENTS_SOURCE="${GLOBAL_AGENTS_SOURCE}" "${INSTALLER}"
 
     [ "$status" -eq 0 ]
     [ "$(readlink "${CODEX_HOME}/AGENTS.md")" = "${user_source}" ]

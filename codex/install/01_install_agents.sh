@@ -8,7 +8,6 @@ PROJ_ROOT="${PROJ_ROOT:-$(cd "${SCRIPTS}/../.." && pwd)}"
 AGENT_SOURCE="${AGENT_SOURCE:-${PROJ_ROOT}/codex/agents}"
 CODEX_HOME="${CODEX_HOME:-${HOME}/.codex}"
 AGENTS_DIR="${AGENTS_DIR:-${CODEX_HOME:-${HOME}/.codex}/agents/}"
-FORCE="${FORCE:-0}"
 
 # shellcheck source=lib/managed_state.sh disable=SC1091
 . "${SCRIPTS}/lib/managed_state.sh"
@@ -56,28 +55,6 @@ validate_environment() {
 # They are installed into one flat directory, so only their basenames matter.
 list_repo_agent_files() {
     find "${AGENT_SOURCE}" -type f -name "*.toml" | sort
-}
-
-list_repo_agents() {
-    local source_file
-
-    while IFS= read -r source_file; do
-        basename "${source_file}"
-    done < <(list_repo_agent_files)
-}
-
-find_agent_source() {
-    local agent_name="${1}"
-    local source_file
-
-    while IFS= read -r source_file; do
-        if [ "$(basename "${source_file}")" = "${agent_name}" ]; then
-            printf '%s\n' "${source_file}"
-            return 0
-        fi
-    done < <(list_repo_agent_files)
-
-    return 1
 }
 
 is_recognized_legacy_agent_link() {

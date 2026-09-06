@@ -63,7 +63,7 @@ SHARED_SKILLS_ROOT="${REPO_ROOT}/shared/skills"
     printf 'second version\n' > "${source_root}/prime/SKILL.md"
     printf 'stale\n' > "${codex_home}/skills/prime/stale.md"
 
-    run env CODEX_HOME="${codex_home}" SKILL_SOURCE="${source_root}" FORCE=1 \
+    run env CODEX_HOME="${codex_home}" SKILL_SOURCE="${source_root}" \
         "${REPO_ROOT}/codex/install/03_install_skills.sh"
 
     [ "$status" -eq 0 ]
@@ -84,7 +84,7 @@ SHARED_SKILLS_ROOT="${REPO_ROOT}/shared/skills"
     printf 'external\n' > "${user_source}/writer/SKILL.md"
     ln -s "${user_source}/writer" "${codex_home}/skills/writer"
 
-    run env CODEX_HOME="${codex_home}" SKILL_SOURCE="${source_root}" FORCE=1 \
+    run env CODEX_HOME="${codex_home}" SKILL_SOURCE="${source_root}" \
         "${REPO_ROOT}/codex/install/03_install_skills.sh"
 
     [ "$status" -eq 0 ]

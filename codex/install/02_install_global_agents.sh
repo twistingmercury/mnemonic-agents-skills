@@ -8,7 +8,6 @@ PROJ_ROOT="${PROJ_ROOT:-$(cd "${SCRIPTS}/../.." && pwd)}"
 GLOBAL_AGENTS_SOURCE="${GLOBAL_AGENTS_SOURCE:-${PROJ_ROOT}/codex/agents/global-agents.md}"
 CODEX_HOME="${CODEX_HOME:-${HOME}/.codex}"
 GLOBAL_AGENTS_TARGET="${CODEX_HOME}/AGENTS.md"
-FORCE="${FORCE:-0}"
 
 # shellcheck source=../../lib/print.sh disable=SC1091
 . "${PROJ_ROOT}/lib/print.sh"
