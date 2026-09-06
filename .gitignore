@@ -78,5 +78,11 @@ docs/scripts/
 **/rlm_state/
 **/rlm_state/*
 **/*.backup
+**/.local/
+**/_local/
 **/local/
+**/scratch/
 code-reviews
+.local/
+/docs/code_reviews/
+/.local/*
