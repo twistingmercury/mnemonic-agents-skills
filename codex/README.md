@@ -19,7 +19,7 @@ details.
 
 [`global-agents.md`](agents/global-agents.md) defines the main-agent coordination
 rules and concise role registry. Installation materializes it as the global
-`AGENTS.md` in `CODEX_HOME`.
+`AGENTS.md` in `CODEX_HOME` as a regular file.
 
 A nonempty `AGENTS.override.md` in the same directory takes precedence over
 `AGENTS.md`. The installer warns but does not change the override, so the
@@ -35,6 +35,7 @@ precedence over the global registry.
 - Bash 4 or newer is available.
 - `rsync` is available on `PATH`; the installer uses it to copy managed
   content and stops with an actionable error when it is unavailable.
+- Make is available if using the Make targets below.
 - The configured `CODEX_HOME` location, or its parent when it does not yet
   exist, is writable.
 
@@ -61,24 +62,29 @@ Run a single phase when troubleshooting or developing an installer:
 ./codex/install/03_install_skills.sh
 ```
 
-Set `FORCE=1` when explicitly refreshing repository-managed content:
+Rerun the installer after updating the checkout to refresh repository-managed
+content:
 
 ```bash
-FORCE=1 ./codex/install/install.sh
+./codex/install/install.sh
 ```
 
 ### Preservation behavior
 
-- The installer records its managed paths beneath `CODEX_HOME`. On later runs,
-  it refreshes only those manifest-owned copies; `FORCE=1` does not allow it to
-  overwrite an untracked collision.
+- The installer records its managed paths beneath `CODEX_HOME`. Ordinary
+  reruns refresh those manifest-owned copies and preserve untracked collisions.
+  Local edits to managed copies are overwritten during refresh.
 - Existing agent files, skills, or `$CODEX_HOME/AGENTS.md` that are not in that
   manifest are preserved, as are unrelated symlinks.
 - Recognized legacy repository symlinks are migrated to local copies. This
   includes the previous repository layouts for agents, skills, and global
   rules; unrelated links remain untouched.
-- Managed skills are synchronized with `rsync -a --delete` only within their
-  already manifest-owned directory, so user-owned paths are not deleted.
+- Each skill is copied with `rsync -a` into a new temporary directory. After
+  copying succeeds, the installer removes the existing managed skill directory
+  and moves the staged copy into its place. Replacement removes stale files,
+  including local additions inside that managed directory; unrelated paths
+  outside it remain preserved. Staging does not provide rollback if replacement
+  fails.
 
 Restart Codex after installation so it reloads agents, rules, and skills.
 
@@ -86,10 +92,9 @@ Restart Codex after installation so it reloads agents, rules, and skills.
 
 ### Agents, rules, or skills do not appear
 
-Rerun the installer and restart Codex. Installed agents, rules, and skills are
-local copies, so they remain available after moving or removing the checkout.
-If content is outdated, rerun the installer (optionally with `FORCE=1`) and
-restart Codex.
+Installed copies of this catalog remain available after moving or removing the
+checkout. If content is missing or outdated, rerun the installer from a current
+checkout and restart Codex.
 
 ### Global rules were not installed
 
@@ -108,14 +113,16 @@ active.
 
 ## Testing
 
-The validation and installer suite requires BATS and Python 3.11 or newer:
+The validation and installer suite requires BATS, Python 3.11 or newer, Bash,
+rsync, and Make. From the repository root, clear destination overrides so tests
+use their temporary fixtures:
 
 ```bash
-make test-codex
+env -u AGENTS_DIR -u SKILLS_DIR make test-codex
 ```
 
-Validate installer shell scripts separately with:
+With ShellCheck installed, validate the installer scripts and shared helpers:
 
 ```bash
-shellcheck codex/install/*.sh
+shellcheck codex/install/*.sh codex/install/lib/*.sh
 ```

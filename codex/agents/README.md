@@ -13,4 +13,4 @@ Model settings are intentionally omitted so each custom agent inherits the activ
 
 The source tree retains language and responsibility groupings for maintainability. The Codex installer flattens the TOML definitions into `$CODEX_HOME/agents/`, defaulting to `~/.codex/agents/`, where Codex discovers personal custom agents.
 
-[`global-agents.md`](global-agents.md) defines the global coordination policy and concise routing registry for this catalog. The Codex installer links it as `$CODEX_HOME/AGENTS.md`. The TOML `name` and `description` fields remain authoritative for agent identity and native routing metadata; the global registry adds orchestration policy without duplicating full agent instructions.
+[`global-agents.md`](global-agents.md) defines the global coordination policy and concise routing registry for this catalog. The Codex installer copies it to `$CODEX_HOME/AGENTS.md` as a regular file. The TOML `name` and `description` fields remain authoritative for agent identity and native routing metadata; the global registry adds orchestration policy without duplicating full agent instructions.

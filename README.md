@@ -68,9 +68,12 @@ produce artifacts; the main client integrates the result.
 This is a reference implementation, not a framework. Adapt prompts and routing
 rules to the needs of each project.
 
-Installed agent and skill links remain connected to this checkout. Keep it in
-a stable location, or rerun installation after moving it. Review potential
-name conflicts and existing global guidance before installation.
+Claude Code installs agent and skill symlinks that remain connected to this
+checkout, so keep it in a stable location or rerun installation after moving it.
+Codex installs local copies of this catalog that remain usable after moving or
+removing the checkout; rerun its installer to refresh managed content from an
+updated checkout. Review potential name conflicts and existing global guidance
+before installation.
 
 Naming, configuration precedence, preservation rules, and destinations differ
 by platform. Read the [Claude Code guide](claude/README.md) or
@@ -100,10 +103,12 @@ make help
 
 ### Testing
 
-Run both platform test suites:
+With BATS, Python 3.11+, Bash, and rsync available, run both platform test suites
+from the repository root. Clear destination overrides so tests use their
+temporary fixtures:
 
 ```bash
-make test
+env -u AGENTS_DIR -u SKILLS_DIR make test
 ```
 
 Run the shared RLM unit tests:
