@@ -117,7 +117,7 @@ materialize_skill() {
         printf "ERROR: failed to create temporary skill directory: %s\n" "${target_dir}" >&2
         return 1
     fi
-    if ! rsync -a --delete "${source_dir}/" "${temporary_dir}/"; then
+    if ! rsync -a "${source_dir}/" "${temporary_dir}/"; then
         rm -rf "${temporary_dir}"
         printf "ERROR: failed to materialize skill: %s\n" "$(basename "${source_dir}")" >&2
         return 1
