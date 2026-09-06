@@ -7,15 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-09-06
+
+### Changed
+
+- Simplified Codex installers by removing unused `FORCE` assignments and agent
+  discovery helpers, sharing staged file copying, and removing redundant
+  rsync `--delete` for empty skill staging directories. Existing ownership,
+  refresh, migration, and preservation behavior remains unchanged.
+- Strengthened BATS coverage for temporary-file creation, copy, and rename
+  failures, including staging cleanup and preservation of existing managed files.
+
+### Fixed
+
+- Corrected README descriptions of Codex copies, ordinary refresh, staged skill
+  replacement, Claude preservation behavior, and agent sandbox configuration.
+- Updated the README skill catalog, installation targets, prerequisites, and
+  test commands that clear inherited destination overrides.
+- Made RLM README examples runnable with bundled files and documented working
+  directories, state paths, and optional parser dependencies.
+
+## [1.2.0] - 2026-09-03
+
 ### Fixed
 
 - Materialized Codex agents, skills, and global rules as manifest-owned local
   copies rather than repository symlinks, allowing Codex to load them without
   depending on the checkout location.
 
-### Changed
+## [1.1.1] - 2026-08-19
 
-- Changed the project license from Apache-2.0 to MIT.
+### Added
+
+- Added the `check-push-readiness` skill to assess the committed changes that
+  the next push would transfer.
 
 ## [1.1.0] - 2026-08-17
 
@@ -27,6 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `lib/print.sh`.
 - Renamed installer phases to snake_case and removed the legacy root-level
   `install/`, `agents/`, and `skills/` directories.
+- Changed the project license from Apache-2.0 to MIT.
 
 ## [1.0.0] - 2026-03-16
 

@@ -53,6 +53,7 @@ the embedded `Last Updated` date to avoid unnecessary rewrites unless
 
 - Claude Code is installed.
 - Bash 4 or newer is available.
+- Make is available if using the Make targets below.
 - The home directory is writable. The full installer creates `~/.claude` as
   needed; the standalone global-rules phase expects it to exist already.
 
@@ -87,14 +88,15 @@ FORCE=1 ./claude/install/install.sh
 
 ### Preservation behavior
 
-- Agent and skill names not managed by this repository are preserved.
+- Agent and skill names absent from the repository catalog are preserved,
+  except broken agent symlinks, which are removed.
 - Agent or skill paths whose basenames collide with repository-managed content
   may be replaced. Back up custom content with a colliding name first.
-- Broken agent symlinks are removed during installation.
-- Before changing an existing `~/.claude/CLAUDE.md`, the global-rules phase
-  creates `~/.claude/CLAUDE.md.<timestamp>.backup`.
-- Only the content between the managed rule markers is replaced. Content
-  outside those markers remains user-owned.
+- The global-rules phase creates `~/.claude/CLAUDE.md.<timestamp>.backup` when
+  adding rules to an existing file without a managed block or replacing a block
+  with a readable installed date.
+- For a dated block with complete rule markers, updates remove the old block
+  and append the current one, retaining content outside those markers.
 
 Restart Claude Code after installation so it reloads agents, rules, and skills.
 
@@ -108,9 +110,9 @@ installer from the checkout's new location repairs repository-managed links.
 
 ### Global rules were overwritten
 
-Look for `~/.claude/CLAUDE.md.<timestamp>.backup`. The installer creates this
-backup before it changes an existing global configuration. If installation
-fails after the backup is created, it attempts to restore that backup.
+Look for `~/.claude/CLAUDE.md.<timestamp>.backup`, created for the updates
+described in [Preservation behavior](#preservation-behavior). If installation
+fails after the backup is created, the installer attempts to restore it.
 
 ### The global-rules phase cannot find Claude configuration
 
@@ -122,13 +124,14 @@ Confirm that `~/.claude` exists and is writable, then rerun:
 
 ## Testing
 
-The installer suite requires BATS:
+The installer suite requires BATS, Bash, and Make. From the repository root,
+clear destination overrides so tests use their temporary fixtures:
 
 ```bash
-make test-claude
+env -u AGENTS_DIR -u SKILLS_DIR make test-claude
 ```
 
-Validate installer shell scripts separately with:
+With ShellCheck installed, validate installer shell scripts separately:
 
 ```bash
 shellcheck claude/install/*.sh

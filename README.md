@@ -1,7 +1,7 @@
 # Claude Code and Codex Agent Ecosystem
 
 > **Maturity Level**: Basic - Ready for use and actively evolving.
-> **Version**: v1.1.0
+> **Version**: v1.2.1
 >
 > - **Emerging**: Prototype, not production-ready, expect breaking changes
 > - **Basic**: Production-ready but actively evolving, expect minor version changes
@@ -43,6 +43,7 @@ Portable skills are shared across both integrations:
 | Skill                    | Purpose                                               |
 | ------------------------ | ----------------------------------------------------- |
 | `arch-docs`              | Create and update architecture documentation          |
+| `check-push-readiness`   | Assess committed changes before pushing               |
 | `code-review`            | Coordinate review across multiple concerns            |
 | `docker-first-ci`        | Implement and harden Docker-first CI/CD pipelines     |
 | `prime`                  | Survey a repository and build working context         |
@@ -83,14 +84,16 @@ by platform. Read the [Claude Code guide](claude/README.md) or
 
 ### Quick Start
 
-Install both integrations from the repository root:
+Install both integrations from the repository root after checking the
+prerequisites in the platform guides:
 
 ```bash
 make install-all
 ```
 
-Restart each client after installation. For a single client, follow its
-platform guide.
+For a single client, use `make install-claude` or `make install-codex`.
+`make install` is an alias for the Claude target. Restart each client after
+installation.
 
 ### Building & running
 
@@ -103,9 +106,9 @@ make help
 
 ### Testing
 
-With BATS, Python 3.11+, Bash, and rsync available, run both platform test suites
-from the repository root. Clear destination overrides so tests use their
-temporary fixtures:
+With BATS, Python 3.11+, Bash 4+, rsync, and Make available, run both platform
+test suites from the repository root. Clear destination overrides so tests
+use their temporary fixtures:
 
 ```bash
 env -u AGENTS_DIR -u SKILLS_DIR make test
@@ -121,10 +124,11 @@ Run the shared RLM unit tests:
 
 This project follows [Semantic Versioning 2.0.0](https://semver.org/).
 
-Determine the version from Git tags:
+See [CHANGELOG.md](CHANGELOG.md) for release notes. Inspect the checked-out
+revision relative to Git tags with:
 
 ```bash
 git describe --tags --always
 ```
 
-Current version: `v1.1.0`.
+Between tags, the command includes the commit count and abbreviated commit hash.

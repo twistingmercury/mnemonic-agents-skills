@@ -46,31 +46,53 @@ context=./architecture-docs query="Compare security and communications assumptio
 2. Reuse the persisted REPL state for additional queries.
 3. Reset and reload manually when source content changes.
 
-State is persisted at `.mnemonic/rlm_state/state.pkl` by default.
+State is persisted at `.mnemonic/rlm_state/state.pkl` relative to the current
+working directory by default. Use the global `--state <path>` option before a
+subcommand to select another state file; use the same path for subsequent calls.
 
 ## Key Considerations
 
 - Most important workflow: load once, run many queries, reset only when needed.
 - Corpus mode is recursive and honors `.rlmignore`.
 - Default corpus excludes: `.git/`, `node_modules/`, `bin/`, `_archive/`.
-- Optional parsers are required for `pdf`, `docx`, and `odt`.
+- Text ingestion uses Python's standard library. Optional parsers are required
+  for PDF (`pypdf`), DOCX (`python-docx`), and ODT (`odfpy`).
 - Best-effort ingestion is default; `--strict` fails on first parse error.
 
 ## Development Considerations
 
 ### Quick Start
 
+The commands below assume this skill directory is your working directory.
+From the repository root, change into it first:
+
+```bash
+cd shared/skills/rlm
+```
+
+Check optional parsers and preview their installation command:
+
 ```bash
 python3 scripts/rlm_repl.py check-deps
 python3 scripts/rlm_repl.py install-deps --all --dry-run
 ```
 
+`check-deps` exits with status 1 if an optional parser is unavailable. The dry
+run does not install packages; these parsers are unnecessary for text files.
+
+When using an installed skill from another project, invoke `rlm_repl.py` by its
+path inside that installed skill directory. Stay in your project directory to
+keep the default state there.
+
 ### Building & running
+
+These examples use this README and the bundled reference documents. Substitute
+your own file or directory paths as needed.
 
 Single-file mode:
 
 ```bash
-python3 scripts/rlm_repl.py init <context_file>
+python3 scripts/rlm_repl.py init README.md
 python3 scripts/rlm_repl.py status
 python3 scripts/rlm_repl.py exec -c "print(grep('security', max_matches=5))"
 ```
@@ -78,7 +100,7 @@ python3 scripts/rlm_repl.py exec -c "print(grep('security', max_matches=5))"
 Corpus mode:
 
 ```bash
-python3 scripts/rlm_repl.py init-corpus <context_dir>
+python3 scripts/rlm_repl.py init-corpus references
 python3 scripts/rlm_repl.py status
 python3 scripts/rlm_repl.py exec -c "print(grep('observability', max_matches=5))"
 ```
@@ -86,7 +108,7 @@ python3 scripts/rlm_repl.py exec -c "print(grep('observability', max_matches=5))
 Strict corpus mode:
 
 ```bash
-python3 scripts/rlm_repl.py init-corpus <context_dir> --strict
+python3 scripts/rlm_repl.py init-corpus references --strict
 ```
 
 Reset state:
