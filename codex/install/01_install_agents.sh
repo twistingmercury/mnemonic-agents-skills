@@ -12,6 +12,9 @@ AGENTS_DIR="${AGENTS_DIR:-${CODEX_HOME:-${HOME}/.codex}/agents/}"
 # shellcheck source=lib/managed_state.sh disable=SC1091
 . "${SCRIPTS}/lib/managed_state.sh"
 
+# shellcheck source=lib/materialize_file.sh disable=SC1091
+. "${SCRIPTS}/lib/materialize_file.sh"
+
 is_unsafe_agents_dir() {
     local resolved_dir
 
@@ -77,17 +80,18 @@ is_recognized_legacy_agent_link() {
 materialize_agent() {
     local source_file="${1}"
     local target_file="${2}"
-    local temporary_file
+    local copy_status=0
 
-    if ! temporary_file="$(mktemp "${target_file}.tmp.XXXXXX")"; then
+    materialize_file_copy "${source_file}" "${target_file}" || copy_status=$?
+    if [ "${copy_status}" -eq 2 ]; then
         printf "ERROR: failed to create temporary agent file: %s\n" "${target_file}" >&2
         return 1
     fi
-    if ! rsync -a "${source_file}" "${temporary_file}" || ! mv -f "${temporary_file}" "${target_file}"; then
-        rm -f "${temporary_file}"
+    if [ "${copy_status}" -ne 0 ]; then
         printf "ERROR: failed to materialize agent: %s\n" "$(basename "${source_file}")" >&2
         return 1
     fi
+    return 0
 }
 
 install_repo_agents() {

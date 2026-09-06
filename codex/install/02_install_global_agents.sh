@@ -15,6 +15,9 @@ GLOBAL_AGENTS_TARGET="${CODEX_HOME}/AGENTS.md"
 # shellcheck source=lib/managed_state.sh disable=SC1091
 . "${SCRIPTS}/lib/managed_state.sh"
 
+# shellcheck source=lib/materialize_file.sh disable=SC1091
+. "${SCRIPTS}/lib/materialize_file.sh"
+
 is_unsafe_codex_home() {
     local resolved_home
 
@@ -104,15 +107,15 @@ warn_about_override() {
 }
 
 materialize_global_rules() {
-    local temporary_file
+    local copy_status=0
 
-    if ! temporary_file="$(mktemp "${GLOBAL_AGENTS_TARGET}.tmp.XXXXXX")"; then
+    materialize_file_copy "${GLOBAL_AGENTS_SOURCE}" "${GLOBAL_AGENTS_TARGET}" || copy_status=$?
+    if [ "${copy_status}" -eq 2 ]; then
         print::error "failed to create temporary global agent rules file: ${GLOBAL_AGENTS_TARGET}"
         return 1
     fi
 
-    if ! rsync -a "${GLOBAL_AGENTS_SOURCE}" "${temporary_file}" || ! mv -f "${temporary_file}" "${GLOBAL_AGENTS_TARGET}"; then
-        rm -f "${temporary_file}"
+    if [ "${copy_status}" -ne 0 ]; then
         print::error "failed to materialize global agent rules: ${GLOBAL_AGENTS_TARGET}"
         return 1
     fi

@@ -5,7 +5,7 @@ AGENT_INSTALLER="${REPO_ROOT}/codex/install/01_install_agents.sh"
 CODEX_INSTALLER="${REPO_ROOT}/codex/install/install.sh"
 
 setup() {
-    TEST_TMP="$(mktemp -d)"
+    TEST_TMP="$(mktemp -d "${BATS_TEST_TMPDIR}/agents.XXXXXX")"
     export TEST_TMP
     export AGENT_SOURCE="${TEST_TMP}/agents"
     export CODEX_HOME="${TEST_TMP}/codex-home"
@@ -23,6 +23,24 @@ make_agent() {
     mkdir -p "$(dirname "${AGENT_SOURCE}/${relative_path}")"
     printf 'name = "%s"\n' "$(basename "${relative_path}" .toml)" \
         > "${AGENT_SOURCE}/${relative_path}"
+}
+
+make_fake_command() {
+    local command_name="${1}"
+    local exit_status="${2}"
+    local fake_bin="${TEST_TMP}/fake-${command_name}-bin"
+
+    mkdir -p "${fake_bin}"
+    printf '#!/usr/bin/env bash\n' > "${fake_bin}/${command_name}"
+    if [ "${command_name}" = rsync ]; then
+        # A failed transfer may have already written part of its destination.
+        # shellcheck disable=SC2016
+        printf '%s\n' 'printf "partial copy\n" > "${!#}"' \
+            >> "${fake_bin}/${command_name}"
+    fi
+    printf 'exit %s\n' "${exit_status}" >> "${fake_bin}/${command_name}"
+    chmod +x "${fake_bin}/${command_name}"
+    printf '%s\n' "${fake_bin}"
 }
 
 @test "installer fails when AGENT_SOURCE is missing" {
@@ -190,22 +208,62 @@ make_agent() {
     [[ "$output" == *"Skipping existing non-symlink path: reviewer.toml"* ]]
 }
 
-@test "rsync failure returns nonzero and does not record the agent as managed" {
-    local fake_bin="${TEST_TMP}/fake-bin"
+@test "mktemp rsync and mv failures leave first agent installs unowned and clean" {
+    local command_name fake_bin expected_error
     make_agent "general/reviewer.toml"
-    mkdir -p "${AGENTS_DIR}" "${fake_bin}"
-    printf '#!/usr/bin/env bash\nexit 73\n' > "${fake_bin}/rsync"
-    chmod +x "${fake_bin}/rsync"
 
-    run env AGENT_SOURCE="${AGENT_SOURCE}" AGENTS_DIR="${AGENTS_DIR}" \
-        PATH="${fake_bin}:${PATH}" "${AGENT_INSTALLER}"
+    for command_name in mktemp rsync mv; do
+        CODEX_HOME="${TEST_TMP}/${command_name}-home"
+        AGENTS_DIR="${CODEX_HOME}/agents"
+        fake_bin="$(make_fake_command "${command_name}" 73)"
+        if [ "${command_name}" = mktemp ]; then
+            expected_error="failed to create temporary agent file"
+        else
+            expected_error="failed to materialize agent: reviewer.toml"
+        fi
 
-    [ "$status" -ne 0 ]
-    [[ "$output" == *"failed to materialize agent: reviewer.toml"* ]]
-    [[ "$output" == *"failed to install repo agents"* ]]
-    [[ "$output" != *"Installed: reviewer.toml"* ]]
-    [ ! -e "${AGENTS_DIR}/reviewer.toml" ]
-    [ ! -e "${CODEX_HOME}/.mnemonic-agents-skills/managed-paths" ]
+        # The installer calls the copy helper conditionally, disabling errexit
+        # inside it. These failures must still propagate to the executable.
+        run env PATH="${fake_bin}:${PATH}" "${AGENT_INSTALLER}"
+
+        [ "$status" -ne 0 ]
+        [[ "$output" == *"${expected_error}"* ]]
+        [[ "$output" == *"failed to install repo agents"* ]]
+        [[ "$output" != *"Installed: reviewer.toml"* ]]
+        [[ "$output" != *"Installed 1 repo agent(s)"* ]]
+        [[ "$output" != *"SUCCESS: all agents updated"* ]]
+        [ ! -e "${AGENTS_DIR}/reviewer.toml" ]
+        [ ! -e "${CODEX_HOME}/.mnemonic-agents-skills/managed-paths" ]
+        [ -d "${AGENTS_DIR}" ]
+        [ -z "$(find "${CODEX_HOME}" -type f -print)" ]
+    done
+}
+
+@test "rsync and mv failures preserve managed agents and clean staging files" {
+    local command_name fake_bin installed_files
+    make_agent "general/reviewer.toml"
+    "${AGENT_INSTALLER}" >/dev/null
+    cp "${CODEX_HOME}/.mnemonic-agents-skills/managed-paths" \
+        "${TEST_TMP}/managed-paths.before"
+    installed_files="$(find "${CODEX_HOME}" -type f -print | sort)"
+    printf 'name = "new-reviewer"\n' > "${AGENT_SOURCE}/general/reviewer.toml"
+
+    for command_name in rsync mv; do
+        fake_bin="$(make_fake_command "${command_name}" 73)"
+
+        run env PATH="${fake_bin}:${PATH}" "${AGENT_INSTALLER}"
+
+        [ "$status" -ne 0 ]
+        [[ "$output" == *"failed to materialize agent: reviewer.toml"* ]]
+        [[ "$output" == *"failed to install repo agents"* ]]
+        [[ "$output" != *"Installed: reviewer.toml"* ]]
+        [[ "$output" != *"SUCCESS: all agents updated"* ]]
+        [ ! -L "${AGENTS_DIR}/reviewer.toml" ]
+        [ "$(cat "${AGENTS_DIR}/reviewer.toml")" = 'name = "reviewer"' ]
+        cmp -s "${TEST_TMP}/managed-paths.before" \
+            "${CODEX_HOME}/.mnemonic-agents-skills/managed-paths"
+        [ "$(find "${CODEX_HOME}" -type f -print | sort)" = "${installed_files}" ]
+    done
 }
 
 @test "installer reports an actionable error when rsync is unavailable" {
