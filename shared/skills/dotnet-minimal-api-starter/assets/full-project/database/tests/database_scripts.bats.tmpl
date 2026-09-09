@@ -1,0 +1,73 @@
+#!/usr/bin/env bats
+
+setup() {
+    TEST_REPO="${BATS_TEST_TMPDIR}/repo"
+    TEST_BIN="${BATS_TEST_TMPDIR}/bin"
+    COMMAND_LOG="${BATS_TEST_TMPDIR}/commands.log"
+    SQL_LOG="${BATS_TEST_TMPDIR}/sql.log"
+    export COMMAND_LOG SQL_LOG
+    mkdir -p "${TEST_REPO}/database/lib" "${TEST_REPO}/database/sql" "${TEST_BIN}"
+    cp "${BATS_TEST_DIRNAME}/../build.sh" "${BATS_TEST_DIRNAME}/../Dockerfile" "${TEST_REPO}/database/"
+    cp "${BATS_TEST_DIRNAME}/../migrate.sh" "${TEST_REPO}/database/"
+    cp "${BATS_TEST_DIRNAME}/../lib/helpers.sh" "${TEST_REPO}/database/lib/"
+    cp "${BATS_TEST_DIRNAME}/../sql/"*.sql "${TEST_REPO}/database/sql/"
+    touch "${TEST_REPO}/docker-compose.yaml"
+
+    cat > "${TEST_BIN}/docker" <<'MOCK'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "${COMMAND_LOG}"
+if [ "$1" = compose ]; then
+    cat >> "${SQL_LOG}"
+fi
+if [ "$1" = push ]; then
+    exit "${PUSH_STATUS:-0}"
+fi
+exit "${DOCKER_STATUS:-0}"
+MOCK
+    chmod +x "${TEST_BIN}/docker"
+    export PATH="${TEST_BIN}:${PATH}"
+    unset DOCKER_STATUS PUSH_STATUS REGISTRY_HOST REGISTRY_USERNAME REGISTRY_TOKEN
+}
+
+@test "database build creates test and date tags without pushing by default" {
+    run env DATE_TAG=2026-09-08 "${TEST_REPO}/database/build.sh"
+
+    [ "${status}" -eq 0 ]
+    [ "$(wc -l < "${COMMAND_LOG}")" -eq 1 ]
+    grep -Fq -- '--tag {{DATABASE_IMAGE_NAME}}:test' "${COMMAND_LOG}"
+    grep -Fq -- '--tag {{DATABASE_IMAGE_NAME}}:2026-09-08' "${COMMAND_LOG}"
+}
+
+@test "database build logs in and propagates a push failure" {
+    run env PUSH=1 DATE_TAG=2026-09-08 REGISTRY_HOST=registry.test \
+        REGISTRY_USERNAME=user REGISTRY_TOKEN=secret PUSH_STATUS=23 \
+        "${TEST_REPO}/database/build.sh"
+
+    [ "${status}" -eq 23 ]
+    [[ "${output}" != *secret* ]]
+    grep -Fq 'login registry.test --username user --password-stdin' "${COMMAND_LOG}"
+    grep -Fq 'push {{DATABASE_IMAGE_NAME}}:test' "${COMMAND_LOG}"
+    run grep -Fq 'push {{DATABASE_IMAGE_NAME}}:2026-09-08' "${COMMAND_LOG}"
+    [ "${status}" -eq 1 ]
+}
+
+@test "migration executes all SQL stages with rendered defaults" {
+    run "${TEST_REPO}/database/migrate.sh"
+
+    [ "${status}" -eq 0 ]
+    [ "$(wc -l < "${COMMAND_LOG}")" -eq 4 ]
+    grep -Fq 'exec -T {{PROJECT_SLUG}}_pg_db psql' "${COMMAND_LOG}"
+    grep -Fq -- '-v db_name={{PROJECT_SLUG}}' "${COMMAND_LOG}"
+    grep -Fq -- '-v db_user={{PROJECT_SLUG}}_user' "${COMMAND_LOG}"
+    grep -Fq 'CREATE USER' "${SQL_LOG}"
+    grep -Fq 'CREATE TABLE IF NOT EXISTS {{RESOURCE_ROUTE}}' "${SQL_LOG}"
+    grep -Fq 'INSERT INTO {{RESOURCE_ROUTE}}' "${SQL_LOG}"
+}
+
+@test "migration rejects arguments before invoking Docker" {
+    run "${TEST_REPO}/database/migrate.sh" unexpected
+
+    [ "${status}" -eq 2 ]
+    [[ "${output}" == *'Usage: migrate.sh (no arguments)'* ]]
+    [ ! -e "${COMMAND_LOG}" ]
+}

@@ -1,0 +1,40 @@
+using {{API_NAME}}.DataAccess;
+using {{API_NAME}}.DataAccess.DTOs;
+using {{API_NAME}}.Models;
+using Microsoft.EntityFrameworkCore;
+
+namespace {{API_NAME}}.Handlers;
+
+public interface I{{RESOURCE_SINGULAR}}Handler
+{
+    Task<{{RESOURCE_SINGULAR}}Response[]> GetAllAsync(CancellationToken cancellationToken);
+    Task<{{RESOURCE_SINGULAR}}Response?> GetAsync(Guid id, CancellationToken cancellationToken);
+    Task<{{RESOURCE_SINGULAR}}Response> CreateAsync(Create{{RESOURCE_SINGULAR}}Request request, CancellationToken cancellationToken);
+    Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken);
+}
+
+public class {{RESOURCE_SINGULAR}}Handler({{RESOURCE_SINGULAR}}DbContext dbContext) : I{{RESOURCE_SINGULAR}}Handler
+{
+    public Task<{{RESOURCE_SINGULAR}}Response[]> GetAllAsync(CancellationToken cancellationToken) =>
+        dbContext.{{RESOURCE_PLURAL}}.AsNoTracking()
+            .Select(item => new {{RESOURCE_SINGULAR}}Response(item.Id, item.Name))
+            .ToArrayAsync(cancellationToken);
+
+    public Task<{{RESOURCE_SINGULAR}}Response?> GetAsync(Guid id, CancellationToken cancellationToken) =>
+        dbContext.{{RESOURCE_PLURAL}}.AsNoTracking()
+            .Where(item => item.Id == id)
+            .Select(item => new {{RESOURCE_SINGULAR}}Response(item.Id, item.Name))
+            .SingleOrDefaultAsync(cancellationToken);
+
+    public async Task<{{RESOURCE_SINGULAR}}Response> CreateAsync(Create{{RESOURCE_SINGULAR}}Request request, CancellationToken cancellationToken)
+    {
+        var item = new {{RESOURCE_SINGULAR}}Dto { Id = Guid.NewGuid(), Name = request.Name };
+        dbContext.{{RESOURCE_PLURAL}}.Add(item);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return new {{RESOURCE_SINGULAR}}Response(item.Id, item.Name);
+    }
+
+    public async Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken) =>
+        await dbContext.{{RESOURCE_PLURAL}}.Where(item => item.Id == id)
+            .ExecuteDeleteAsync(cancellationToken) > 0;
+}

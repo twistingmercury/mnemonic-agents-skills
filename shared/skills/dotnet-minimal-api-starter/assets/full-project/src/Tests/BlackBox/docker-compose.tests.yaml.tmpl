@@ -1,0 +1,26 @@
+services:
+  database:
+    build:
+      context: ../../../database
+      dockerfile: Dockerfile
+    tmpfs:
+      - /var/lib/postgresql
+
+  api:
+    image: ${API_IMAGE:-{{IMAGE_NAME}}:blackbox}
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__DefaultConnection: Host=database;Port=5432;Database={{PROJECT_SLUG}};Username={{PROJECT_SLUG}}_user;Password={{PROJECT_SLUG}}_pass
+    depends_on:
+      database:
+        condition: service_healthy
+
+  tests:
+    build:
+      context: ../../..
+      dockerfile: src/Tests/BlackBox/Dockerfile
+    environment:
+      API_BASE_URL: http://api:8080
+    depends_on:
+      api:
+        condition: service_started

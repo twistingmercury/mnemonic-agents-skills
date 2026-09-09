@@ -1,0 +1,5 @@
+Forward the API service locally:
+
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "{{PROJECT_SLUG}}.fullname" . }} 3033:{{ .Values.service.port }}
+
+Then open http://localhost:3033/swagger/

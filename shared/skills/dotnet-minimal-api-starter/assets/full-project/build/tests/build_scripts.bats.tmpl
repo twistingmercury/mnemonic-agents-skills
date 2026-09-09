@@ -1,0 +1,110 @@
+#!/usr/bin/env bats
+
+setup() {
+    TEST_REPO="${BATS_TEST_TMPDIR}/repo"
+    TEST_BIN="${BATS_TEST_TMPDIR}/bin"
+    NO_GIT_BIN="${BATS_TEST_TMPDIR}/no-git-bin"
+    COMMAND_LOG="${BATS_TEST_TMPDIR}/commands.log"
+    export COMMAND_LOG
+    mkdir -p "${TEST_REPO}/build" "${TEST_REPO}/src/Tests/BlackBox" "${TEST_BIN}" \
+        "${NO_GIT_BIN}"
+    cp "${BATS_TEST_DIRNAME}/../build.sh" "${BATS_TEST_DIRNAME}/../test-black-box.sh" \
+        "${BATS_TEST_DIRNAME}/../Dockerfile" "${TEST_REPO}/build/"
+    cp "${BATS_TEST_DIRNAME}/../../src/Tests/BlackBox/docker-compose.tests.yaml" \
+        "${TEST_REPO}/src/Tests/BlackBox/"
+    cp "${BATS_TEST_DIRNAME}/../../Makefile" "${TEST_REPO}/"
+
+    cat > "${TEST_BIN}/git" <<'MOCK'
+#!/usr/bin/env bash
+if [ "$3" = rev-parse ]; then
+    if [ "${GIT_REV_PARSE_STATUS:-0}" -ne 0 ]; then
+        exit "${GIT_REV_PARSE_STATUS}"
+    fi
+    printf '%s\n' 0123456789abcdef
+    exit 0
+fi
+exit 1
+MOCK
+    cat > "${TEST_BIN}/docker" <<'MOCK'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "${COMMAND_LOG}"
+if [ "$1" = image ] && [ "$2" = inspect ]; then
+    printf '%s\n' sha256:resolved
+fi
+if [ "$1" = compose ] && [ "${6:-}" = run ]; then
+    exit "${TEST_RUN_STATUS:-0}"
+fi
+exit "${DOCKER_STATUS:-0}"
+MOCK
+    chmod +x "${TEST_BIN}/git" "${TEST_BIN}/docker"
+    ln -s "$(command -v bash)" "${NO_GIT_BIN}/bash"
+    ln -s "$(command -v dirname)" "${NO_GIT_BIN}/dirname"
+    ln -s "$(command -v make)" "${NO_GIT_BIN}/make"
+    ln -s "${TEST_BIN}/docker" "${NO_GIT_BIN}/docker"
+    export PATH="${TEST_BIN}:${PATH}"
+    unset API_IMAGE DOCKER_STATUS GIT_REV_PARSE_STATUS TEST_RUN_STATUS GITHUB_OUTPUT
+}
+
+@test "build.sh tags the image, resolves its ID, and runs black-box tests" {
+    export BUILD_DATE=2026-09-08T00:00:00Z
+
+    run "${TEST_REPO}/build/build.sh"
+
+    [ "${status}" -eq 0 ]
+    grep -Fq -- '--tag {{IMAGE_NAME}}:sha-0123456789abcdef' "${COMMAND_LOG}"
+    grep -Fq -- '--tag {{IMAGE_NAME}}:latest' "${COMMAND_LOG}"
+    grep -Fq 'image inspect --format {{.Id}} {{IMAGE_NAME}}:sha-0123456789abcdef' "${COMMAND_LOG}"
+    grep -Fq 'compose --project-name {{PROJECT_SLUG}}-blackbox' "${COMMAND_LOG}"
+}
+
+@test "make build succeeds without Git and uses local development tags" {
+    run env PATH="${NO_GIT_BIN}" BUILD_DATE=2026-09-08T00:00:00Z \
+        make -C "${TEST_REPO}" build
+
+    [ "${status}" -eq 0 ]
+    grep -Fq -- '--build-arg VERSION=development-local' "${COMMAND_LOG}"
+    grep -Fq -- '--build-arg COMMIT=development' "${COMMAND_LOG}"
+    grep -Fq -- '--tag {{IMAGE_NAME}}:development-local' "${COMMAND_LOG}"
+    grep -Fq -- '--tag {{IMAGE_NAME}}:latest-local' "${COMMAND_LOG}"
+    grep -Fq 'image inspect --format {{.Id}} {{IMAGE_NAME}}:development-local' \
+        "${COMMAND_LOG}"
+    grep -Fq 'run --rm --no-deps --pull never -T tests' "${COMMAND_LOG}"
+}
+
+@test "build.sh falls back to development metadata when Git has no HEAD" {
+    run env LOCAL=1 GIT_REV_PARSE_STATUS=128 BUILD_DATE=2026-09-08T00:00:00Z \
+        "${TEST_REPO}/build/build.sh"
+
+    [ "${status}" -eq 0 ]
+    grep -Fq -- '--build-arg VERSION=development-local' "${COMMAND_LOG}"
+    grep -Fq -- '--build-arg COMMIT=development' "${COMMAND_LOG}"
+    grep -Fq -- '--tag {{IMAGE_NAME}}:development-local' "${COMMAND_LOG}"
+    grep -Fq -- '--tag {{IMAGE_NAME}}:latest-local' "${COMMAND_LOG}"
+}
+
+@test "build.sh stops when the image build fails" {
+    run env DOCKER_STATUS=29 "${TEST_REPO}/build/build.sh"
+
+    [ "${status}" -eq 29 ]
+    [ "$(wc -l < "${COMMAND_LOG}")" -eq 1 ]
+}
+
+@test "test-black-box.sh builds, starts, tests, and cleans up" {
+    run "${TEST_REPO}/build/test-black-box.sh"
+
+    [ "${status}" -eq 0 ]
+    grep -Fq 'build --file' "${COMMAND_LOG}"
+    grep -Fq 'compose --project-name {{PROJECT_SLUG}}-blackbox' "${COMMAND_LOG}"
+    grep -Fq 'up --detach --no-build --pull never database api' "${COMMAND_LOG}"
+    grep -Fq 'run --rm --no-deps --pull never -T tests' "${COMMAND_LOG}"
+    grep -Fq 'down --volumes --remove-orphans' "${COMMAND_LOG}"
+    grep -Fq 'image rm {{IMAGE_NAME}}:blackbox' "${COMMAND_LOG}"
+}
+
+@test "test-black-box.sh preserves a test failure while still cleaning up" {
+    run env TEST_RUN_STATUS=17 "${TEST_REPO}/build/test-black-box.sh"
+
+    [ "${status}" -eq 17 ]
+    grep -Fq 'run --rm --no-deps --pull never -T tests' "${COMMAND_LOG}"
+    grep -Fq 'down --volumes --remove-orphans' "${COMMAND_LOG}"
+}

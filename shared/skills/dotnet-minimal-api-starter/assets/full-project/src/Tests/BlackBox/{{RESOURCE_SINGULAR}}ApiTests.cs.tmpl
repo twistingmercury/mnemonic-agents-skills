@@ -1,0 +1,45 @@
+using System.Net;
+using System.Net.Http.Json;
+
+namespace {{API_NAME}}.Tests.BlackBox;
+
+public class {{RESOURCE_SINGULAR}}ApiTests
+{
+    private static readonly Uri BaseUri = new(
+        Environment.GetEnvironmentVariable("API_BASE_URL") ?? "http://localhost:3033");
+
+    [Fact]
+    public async Task Health_and_seeded_resource_are_available()
+    {
+        using var client = new HttpClient { BaseAddress = BaseUri };
+        await WaitUntilHealthyAsync(client);
+
+        var response = await client.GetAsync("/{{RESOURCE_ROUTE}}");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var items = await response.Content.ReadFromJsonAsync<{{RESOURCE_SINGULAR}}Response[]>();
+        Assert.NotNull(items);
+        Assert.Contains(items, item => item.Id == Guid.Parse("00000000-0000-0000-0000-000000000001"));
+    }
+
+    private static async Task WaitUntilHealthyAsync(HttpClient client)
+    {
+        for (var attempt = 0; attempt < 30; attempt++)
+        {
+            try
+            {
+                if ((await client.GetAsync("/healthz")).IsSuccessStatusCode) return;
+            }
+            catch (HttpRequestException)
+            {
+                // The API container may still be starting.
+            }
+
+            await Task.Delay(TimeSpan.FromSeconds(1));
+        }
+
+        throw new TimeoutException("The API did not become healthy within 30 seconds.");
+    }
+
+    private sealed record {{RESOURCE_SINGULAR}}Response(Guid Id, string Name);
+}

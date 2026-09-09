@@ -1,0 +1,115 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+LOCAL="${LOCAL:-0}"
+IMAGE_NAME="${IMAGE_NAME:-{{IMAGE_NAME}}}"
+
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
+
+fail() {
+    printf 'Error: %s\n' "$1" >&2
+    exit 1
+}
+
+require_command() {
+    command -v "$1" >/dev/null 2>&1 || fail "$1 is required."
+}
+
+validate_configuration() {
+    [ "$#" -eq 0 ] || fail 'build.sh does not accept arguments.'
+    [ -f "${SCRIPT_DIR}/Dockerfile" ] || fail "Dockerfile not found: ${SCRIPT_DIR}/Dockerfile"
+    [[ "${LOCAL}" =~ ^[01]$ ]] || fail 'LOCAL must be 0 or 1.'
+    require_command docker
+}
+
+resolve_git_metadata() {
+    GIT_COMMIT='development'
+    RELEASE_TAG=''
+    COMMIT_TAG='development'
+
+    if ! command -v git >/dev/null 2>&1; then
+        return 0
+    fi
+
+    if ! GIT_COMMIT="$(git -C "${PROJECT_ROOT}" rev-parse --verify 'HEAD^{commit}' 2>/dev/null)"; then
+        GIT_COMMIT='development'
+        return 0
+    fi
+
+    RELEASE_TAG="$(git -C "${PROJECT_ROOT}" describe --tags --exact-match HEAD 2>/dev/null || true)"
+    COMMIT_TAG="sha-${GIT_COMMIT}"
+}
+
+build_image() {
+    local image_tag
+    local tag_args=()
+
+    for image_tag in "${IMAGE_TAGS[@]}"; do
+        tag_args+=(--tag "${image_tag}")
+    done
+
+    docker build \
+        --file "${SCRIPT_DIR}/Dockerfile" \
+        --rm \
+        --build-arg "VERSION=${BUILD_VERSION}" \
+        --build-arg "DATE=${BUILD_DATE}" \
+        --build-arg "COMMIT=${BUILD_COMMIT}" \
+        --target final \
+        "${tag_args[@]}" \
+        "${PROJECT_ROOT}"
+}
+
+run_black_box_tests() {
+    API_IMAGE="$(docker image inspect --format '{{.Id}}' "${IMAGE_TAGS[0]}")"
+    export API_IMAGE
+    "${SCRIPT_DIR}/test-black-box.sh"
+}
+
+write_github_outputs() {
+    if [ -z "${GITHUB_OUTPUT:-}" ]; then
+        return 0
+    fi
+
+    {
+        printf '%s\n' 'image_tags<<IMAGE_TAGS'
+        printf '%s\n' "${IMAGE_TAGS[@]}"
+        printf '%s\n' 'IMAGE_TAGS'
+        printf 'image_id=%s\n' "${API_IMAGE}"
+    } >> "${GITHUB_OUTPUT}"
+}
+
+main() {
+    local commit_tag
+    local latest_tag
+
+    validate_configuration "$@"
+
+    resolve_git_metadata
+    commit_tag="${COMMIT_TAG}"
+    latest_tag="latest"
+
+    if [ "${LOCAL}" -eq 1 ]; then
+        commit_tag="${commit_tag}-local"
+        latest_tag="${latest_tag}-local"
+        RELEASE_TAG="${RELEASE_TAG:+${RELEASE_TAG}-local}"
+    fi
+
+    if [ -n "${RELEASE_TAG}" ] && [[ ! "${RELEASE_TAG}" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]]; then
+        fail "Git release tag is not a valid Docker tag: ${RELEASE_TAG}"
+    fi
+
+    BUILD_VERSION="${BUILD_VERSION:-${RELEASE_TAG:-${commit_tag}}}"
+    BUILD_DATE="${BUILD_DATE:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
+    BUILD_COMMIT="${BUILD_COMMIT:-${GIT_COMMIT}}"
+    IMAGE_TAGS=("${IMAGE_NAME}:${commit_tag}")
+    [ -z "${RELEASE_TAG}" ] || IMAGE_TAGS+=("${IMAGE_NAME}:${RELEASE_TAG}")
+    IMAGE_TAGS+=("${IMAGE_NAME}:${latest_tag}")
+
+    build_image
+    run_black_box_tests
+    write_github_outputs
+}
+
+main "$@"

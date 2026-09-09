@@ -1,0 +1,27 @@
+.PHONY: help run analyze compose test-blackbox build start-db build-db
+
+default: help
+
+help: ## Show available targets.
+	@awk 'BEGIN {FS = ":.*##"; printf "\nAvailable targets:\n"} /^[a-zA-Z0-9_-]+:.*##/ { printf "  %-20s %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
+
+run: ## Run the API directly.
+	@dotnet run --project src/{{API_NAME}}/{{API_NAME}}.csproj
+
+analyze: ## Format, build, test, and audit packages locally.
+	@./scripts/analyze.sh
+
+compose: ## Run the API and PostgreSQL with Docker Compose.
+	@docker compose up --build
+
+test-blackbox: ## Run containerized black-box tests and clean up.
+	@./build/test-black-box.sh
+
+build: ## Run the same containerized build used by CI.
+	@LOCAL=1 ./build/build.sh
+
+start-db: ## Start only the PostgreSQL service.
+	@docker compose up -d {{PROJECT_SLUG}}_pg_db
+
+build-db: ## Build the seeded PostgreSQL image.
+	@./database/build.sh

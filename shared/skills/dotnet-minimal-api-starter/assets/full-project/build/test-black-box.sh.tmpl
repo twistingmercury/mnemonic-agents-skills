@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
+COMPOSE_FILE="${PROJECT_ROOT}/src/Tests/BlackBox/docker-compose.tests.yaml"
+COMPOSE_PROJECT_NAME="{{PROJECT_SLUG}}-blackbox"
+API_IMAGE_CREATED=0
+
+cleanup() {
+    local status=$?
+    local cleanup_status=0
+    local image_cleanup_status=0
+
+    trap - EXIT
+    docker compose --project-name "${COMPOSE_PROJECT_NAME}" --file "${COMPOSE_FILE}" \
+        down --volumes --remove-orphans || cleanup_status=$?
+
+    if [ "${API_IMAGE_CREATED}" -eq 1 ]; then
+        docker image rm "{{IMAGE_NAME}}:blackbox" || image_cleanup_status=$?
+        if [ "${cleanup_status}" -eq 0 ]; then
+            cleanup_status=${image_cleanup_status}
+        fi
+    fi
+
+    if [ "${status}" -eq 0 ]; then
+        status=${cleanup_status}
+    fi
+
+    exit "${status}"
+}
+
+prepare_api_image() {
+    if [ -n "${API_IMAGE:-}" ]; then
+        API_IMAGE="$(docker image inspect --format '{{.Id}}' "${API_IMAGE}")"
+        export API_IMAGE
+        printf 'Running black-box tests against API image: %s\n' "${API_IMAGE}"
+        return 0
+    fi
+
+    docker build \
+        --file "${PROJECT_ROOT}/build/Dockerfile" \
+        --target final \
+        --tag "{{IMAGE_NAME}}:blackbox" \
+        "${PROJECT_ROOT}"
+    API_IMAGE_CREATED=1
+}
+
+main() {
+    if [ "$#" -ne 0 ]; then
+        printf '%s\n' 'Usage: test-black-box.sh (no arguments)' >&2
+        return 2
+    fi
+
+    command -v docker >/dev/null 2>&1 || {
+        printf '%s\n' 'Error: docker is required to run black-box tests.' >&2
+        return 1
+    }
+    [ -f "${COMPOSE_FILE}" ] || {
+        printf 'Error: Compose file not found: %s\n' "${COMPOSE_FILE}" >&2
+        return 1
+    }
+
+    trap cleanup EXIT
+    trap 'exit 130' INT
+    trap 'exit 143' TERM
+
+    prepare_api_image
+    docker compose --project-name "${COMPOSE_PROJECT_NAME}" --file "${COMPOSE_FILE}" build
+    docker compose --project-name "${COMPOSE_PROJECT_NAME}" --file "${COMPOSE_FILE}" \
+        up --detach --no-build --pull never database api
+    docker compose --project-name "${COMPOSE_PROJECT_NAME}" --file "${COMPOSE_FILE}" \
+        run --rm --no-deps --pull never -T tests
+}
+
+main "$@"

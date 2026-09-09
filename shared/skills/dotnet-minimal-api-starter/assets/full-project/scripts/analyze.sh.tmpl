@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
+API_PROJECT="${PROJECT_ROOT}/src/{{API_NAME}}/{{API_NAME}}.csproj"
+UNIT_TEST_PROJECT="${PROJECT_ROOT}/src/Tests/Unit/{{API_NAME}}.Tests.Unit.csproj"
+
+fail() {
+    printf 'Error: %s\n' "$1" >&2
+    exit 1
+}
+
+main() {
+    [ "$#" -eq 0 ] || fail 'analyze.sh does not accept arguments.'
+    command -v dotnet >/dev/null 2>&1 || fail 'dotnet is required.'
+    [ -f "${API_PROJECT}" ] || fail "API project not found: ${API_PROJECT}"
+    [ -f "${UNIT_TEST_PROJECT}" ] || fail "unit test project not found: ${UNIT_TEST_PROJECT}"
+
+    printf '%s\n' 'Running formatters...'
+    dotnet format "${API_PROJECT}" --verbosity detailed
+
+    printf '\n%s\n' 'Checking for published vulnerabilities...'
+    dotnet package list \
+        --project "${API_PROJECT}" \
+        --no-restore \
+        --vulnerable \
+        --include-transitive \
+        --verbosity detailed
+
+    printf '\n%s\n' 'Running unit tests...'
+    dotnet test "${UNIT_TEST_PROJECT}" --configuration Debug
+
+    printf '\n%s\n' 'Checking for compiler warnings...'
+    dotnet build "${API_PROJECT}" \
+        --no-restore \
+        --configuration Debug \
+        -warnaserror
+}
+
+main "$@"

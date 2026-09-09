@@ -1,0 +1,3 @@
+interface:
+  display_name: "C# Minimal API Starter"
+  short_description: "Scaffold a production-shaped .NET minimal API"

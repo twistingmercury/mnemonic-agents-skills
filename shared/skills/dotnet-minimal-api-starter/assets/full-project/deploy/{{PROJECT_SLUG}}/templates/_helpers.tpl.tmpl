@@ -1,0 +1,31 @@
+{{- define "{{PROJECT_SLUG}}.name" -}}
+{{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
+{{- end }}
+
+{{- define "{{PROJECT_SLUG}}.fullname" -}}
+{{- if .Values.fullnameOverride }}
+{{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
+{{- else }}
+{{- printf "%s-%s" .Release.Name (include "{{PROJECT_SLUG}}.name" .) | trunc 63 | trimSuffix "-" }}
+{{- end }}
+{{- end }}
+
+{{- define "{{PROJECT_SLUG}}.labels" -}}
+helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
+app.kubernetes.io/name: {{ include "{{PROJECT_SLUG}}.name" . }}
+app.kubernetes.io/instance: {{ .Release.Name }}
+app.kubernetes.io/managed-by: {{ .Release.Service }}
+{{- end }}
+
+{{- define "{{PROJECT_SLUG}}.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "{{PROJECT_SLUG}}.name" . }}
+app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}
+
+{{- define "{{PROJECT_SLUG}}.serviceAccountName" -}}
+{{- if .Values.serviceAccount.create }}
+{{- default (include "{{PROJECT_SLUG}}.fullname" .) .Values.serviceAccount.name }}
+{{- else }}
+{{- default "default" .Values.serviceAccount.name }}
+{{- end }}
+{{- end }}

@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+
+set -o pipefail
+
+DATABASE_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+PROJECT_ROOT="$(cd -- "${DATABASE_DIR}/.." && pwd)"
+readonly DATABASE_DIR PROJECT_ROOT
+
+helpers::execute_sql_file() {
+    local username="$1"
+    local database_name="$2"
+    local sql_file="$3"
+
+    docker compose --file "${PROJECT_ROOT}/docker-compose.yaml" \
+        exec -T "${DATABASE_SERVICE}" \
+        psql -X -v ON_ERROR_STOP=1 \
+        -v "db_name=${DB_NAME}" \
+        -v "db_user=${DB_USER}" \
+        -v "db_pass=${DB_PASS}" \
+        -U "${username}" \
+        -d "${database_name}" \
+        -f - < "${sql_file}"
+}
+
+helpers::create_user() {
+    helpers::execute_sql_file "${POSTGRES_USER}" postgres "${DATABASE_DIR}/sql/create_user.sql"
+}
+
+helpers::create_database() {
+    helpers::execute_sql_file "${POSTGRES_USER}" postgres "${DATABASE_DIR}/sql/create_database.sql"
+}
+
+helpers::create_tables() {
+    helpers::execute_sql_file "${DB_USER}" "${DB_NAME}" "${DATABASE_DIR}/sql/create_tables.sql"
+}
+
+helpers::seed_data() {
+    helpers::execute_sql_file "${DB_USER}" "${DB_NAME}" "${DATABASE_DIR}/sql/seed_{{RESOURCE_ROUTE}}.sql"
+}

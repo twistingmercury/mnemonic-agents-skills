@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+DATABASE_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+readonly DATABASE_DIR
+
+DB_NAME="${DB_NAME:-{{PROJECT_SLUG}}}"
+DB_USER="${DB_USER:-{{PROJECT_SLUG}}_user}"
+DB_PASS="${DB_PASS:-{{PROJECT_SLUG}}_pass}"
+POSTGRES_USER="${POSTGRES_USER:-postgres}"
+
+: "${DB_NAME:?DB_NAME must not be empty}"
+: "${DB_USER:?DB_USER must not be empty}"
+: "${DB_PASS:?DB_PASS must not be empty}"
+: "${POSTGRES_USER:?POSTGRES_USER must not be empty}"
+
+execute_sql_file() {
+    local username="$1"
+    local database_name="$2"
+    local sql_file="$3"
+
+    psql -X -v ON_ERROR_STOP=1 \
+        -v "db_name=${DB_NAME}" \
+        -v "db_user=${DB_USER}" \
+        -v "db_pass=${DB_PASS}" \
+        -U "${username}" \
+        -d "${database_name}" \
+        -f "${sql_file}"
+}
+
+assign_database_owner() {
+    psql -X -v ON_ERROR_STOP=1 \
+        -v "db_name=${DB_NAME}" \
+        -v "db_user=${DB_USER}" \
+        -U "${POSTGRES_USER}" -d postgres <<'SQL'
+ALTER DATABASE :"db_name" OWNER TO :"db_user";
+SQL
+}
+
+main() {
+    if [ "$#" -ne 0 ]; then
+        printf '%s\n' 'Usage: docker-migrate.sh (no arguments)' >&2
+        return 2
+    fi
+
+    command -v psql >/dev/null 2>&1 || {
+        printf '%s\n' 'Error: psql is required.' >&2
+        return 1
+    }
+
+    execute_sql_file "${POSTGRES_USER}" postgres "${DATABASE_DIR}/sql/create_user.sql"
+    execute_sql_file "${POSTGRES_USER}" postgres "${DATABASE_DIR}/sql/create_database.sql"
+    assign_database_owner
+    execute_sql_file "${DB_USER}" "${DB_NAME}" "${DATABASE_DIR}/sql/create_tables.sql"
+    execute_sql_file "${DB_USER}" "${DB_NAME}" "${DATABASE_DIR}/sql/seed_{{RESOURCE_ROUTE}}.sql"
+}
+
+main "$@"

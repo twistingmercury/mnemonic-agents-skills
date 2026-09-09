@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "{{PROJECT_SLUG}}.fullname" . }}
+  labels:
+    {{- include "{{PROJECT_SLUG}}.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - name: http
+      port: {{ .Values.service.port }}
+      targetPort: http
+  selector:
+    {{- include "{{PROJECT_SLUG}}.selectorLabels" . | nindent 4 }}

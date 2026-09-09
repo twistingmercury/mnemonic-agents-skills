@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "{{PROJECT_SLUG}}.fullname" . }}
+  labels:
+    {{- include "{{PROJECT_SLUG}}.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "{{PROJECT_SLUG}}.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "{{PROJECT_SLUG}}.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      serviceAccountName: {{ include "{{PROJECT_SLUG}}.serviceAccountName" . }}
+      containers:
+        - name: api
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: ASPNETCORE_URLS
+              value: http://+:8080
+            - name: ConnectionStrings__DefaultConnection
+              value: Host={{ include "{{PROJECT_SLUG}}.fullname" . }}-postgres;Port={{ .Values.postgres.port }};Database={{PROJECT_SLUG}};Username={{PROJECT_SLUG}}_user;Password={{PROJECT_SLUG}}_pass
+          ports:
+            - name: http
+              containerPort: 8080
+          livenessProbe:
+            {{- toYaml .Values.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.readinessProbe | nindent 12 }}
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}

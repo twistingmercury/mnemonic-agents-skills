@@ -1,0 +1,17 @@
+# check=skip=SecretsUsedInArgOrEnv
+FROM postgres:18-alpine
+
+# Disposable local-development credentials only.
+ENV POSTGRES_DB=postgres \
+    POSTGRES_USER=postgres \
+    POSTGRES_PASSWORD=postgres \
+    DB_NAME={{PROJECT_SLUG}} \
+    DB_USER={{PROJECT_SLUG}}_user \
+    DB_PASS={{PROJECT_SLUG}}_pass
+
+COPY --chmod=0755 docker-migrate.sh /docker-entrypoint-initdb.d/010-docker-migrate.sh
+COPY sql/ /docker-entrypoint-initdb.d/sql/
+
+EXPOSE 5432
+HEALTHCHECK --interval=2s --timeout=3s --start-period=10s --retries=15 \
+    CMD pg_isready -h 127.0.0.1 -U "$DB_USER" -d "$DB_NAME" || exit 1

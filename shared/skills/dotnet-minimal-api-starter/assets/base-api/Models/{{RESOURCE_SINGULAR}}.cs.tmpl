@@ -1,0 +1,5 @@
+namespace {{API_NAME}}.Models;
+
+public sealed record {{RESOURCE_SINGULAR}}Response(Guid Id, string Name);
+
+public sealed record Create{{RESOURCE_SINGULAR}}Request(string Name);

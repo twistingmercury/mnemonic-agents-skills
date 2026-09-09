@@ -1,0 +1,31 @@
+# {{API_NAME}}
+
+A .NET 10 minimal API for managing {{RESOURCE_PLURAL}}, backed by EF Core and PostgreSQL.
+
+## Run locally
+
+```sh
+docker compose up --build
+curl http://localhost:3033/{{RESOURCE_ROUTE}}
+```
+
+OpenAPI is available at `http://localhost:3033/openapi/v1.json` and Swagger UI at `http://localhost:3033/swagger/`.
+
+## Build and test
+
+```sh
+make analyze
+make build
+```
+
+`make analyze` runs local .NET checks. `make build` performs the Docker-first build and black-box test path used in CI.
+
+## Kubernetes manifests
+
+```sh
+helm lint ./deploy/{{PROJECT_SLUG}} ./deploy/envoy
+helm template {{PROJECT_SLUG}} ./deploy/{{PROJECT_SLUG}}
+helm template envoy ./deploy/envoy
+```
+
+Review image names, credentials, namespaces, resource settings, and NetworkPolicy assumptions before deploying.

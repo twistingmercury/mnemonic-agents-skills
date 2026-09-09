@@ -1,0 +1,16 @@
+using {{API_NAME}}.Models;
+
+namespace {{API_NAME}}.Tests.Unit;
+
+public class {{RESOURCE_SINGULAR}}ModelTests
+{
+    [Fact]
+    public void Response_preserves_values()
+    {
+        var id = Guid.NewGuid();
+        var response = new {{RESOURCE_SINGULAR}}Response(id, "Example");
+
+        Assert.Equal(id, response.Id);
+        Assert.Equal("Example", response.Name);
+    }
+}

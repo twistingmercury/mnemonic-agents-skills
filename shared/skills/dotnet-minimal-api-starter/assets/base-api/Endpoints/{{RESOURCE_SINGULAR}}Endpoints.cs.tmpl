@@ -1,0 +1,43 @@
+using {{API_NAME}}.Handlers;
+using {{API_NAME}}.Models;
+using Microsoft.AspNetCore.Http.HttpResults;
+
+namespace {{API_NAME}}.Endpoints;
+
+public static class {{RESOURCE_SINGULAR}}Endpoints
+{
+    public static IEndpointRouteBuilder Map{{RESOURCE_PLURAL}}(this IEndpointRouteBuilder endpoints)
+    {
+        var group = endpoints.MapGroup("/{{RESOURCE_ROUTE}}").WithTags("{{RESOURCE_PLURAL}}");
+        group.MapGet("/", GetAllAsync);
+        group.MapGet("/{id:guid}", GetAsync);
+        group.MapPost("/", CreateAsync);
+        group.MapDelete("/{id:guid}", DeleteAsync);
+        return endpoints;
+    }
+
+    private static async Task<Ok<{{RESOURCE_SINGULAR}}Response[]>> GetAllAsync(
+        I{{RESOURCE_SINGULAR}}Handler handler, CancellationToken cancellationToken) =>
+        TypedResults.Ok(await handler.GetAllAsync(cancellationToken));
+
+    private static async Task<Results<Ok<{{RESOURCE_SINGULAR}}Response>, NotFound>> GetAsync(
+        Guid id, I{{RESOURCE_SINGULAR}}Handler handler, CancellationToken cancellationToken)
+    {
+        var response = await handler.GetAsync(id, cancellationToken);
+        return response is null ? TypedResults.NotFound() : TypedResults.Ok(response);
+    }
+
+    private static async Task<Results<Created<{{RESOURCE_SINGULAR}}Response>, ValidationProblem>> CreateAsync(
+        Create{{RESOURCE_SINGULAR}}Request request, I{{RESOURCE_SINGULAR}}Handler handler, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(request.Name))
+            return TypedResults.ValidationProblem(new Dictionary<string, string[]> { ["name"] = ["Name is required."] });
+
+        var response = await handler.CreateAsync(request, cancellationToken);
+        return TypedResults.Created("/{{RESOURCE_ROUTE}}/" + response.Id, response);
+    }
+
+    private static async Task<Results<NoContent, NotFound>> DeleteAsync(
+        Guid id, I{{RESOURCE_SINGULAR}}Handler handler, CancellationToken cancellationToken) =>
+        await handler.DeleteAsync(id, cancellationToken) ? TypedResults.NoContent() : TypedResults.NotFound();
+}

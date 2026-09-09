@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+DB_NAME="${DB_NAME:-{{PROJECT_SLUG}}}"
+DB_USER="${DB_USER:-{{PROJECT_SLUG}}_user}"
+DB_PASS="${DB_PASS:-{{PROJECT_SLUG}}_pass}"
+POSTGRES_USER="${POSTGRES_USER:-postgres}"
+DATABASE_SERVICE="${DATABASE_SERVICE:-{{PROJECT_SLUG}}_pg_db}"
+export DB_NAME DB_USER DB_PASS POSTGRES_USER DATABASE_SERVICE
+
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# The generated helper path is resolved relative to this script at runtime.
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/lib/helpers.sh"
+
+main() {
+    if [ "$#" -ne 0 ]; then
+        printf '%s\n' 'Usage: migrate.sh (no arguments)' >&2
+        return 2
+    fi
+
+    helpers::create_user
+    helpers::create_database
+    helpers::create_tables
+    helpers::seed_data
+}
+
+main "$@"

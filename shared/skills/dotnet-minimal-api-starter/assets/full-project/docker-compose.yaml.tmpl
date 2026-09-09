@@ -1,0 +1,36 @@
+services:
+  {{PROJECT_SLUG}}_pg_db:
+    build:
+      context: ./database
+      dockerfile: Dockerfile
+    image: {{DATABASE_IMAGE_NAME}}:local
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "6432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U {{PROJECT_SLUG}}_user -d {{PROJECT_SLUG}}"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+
+  {{PROJECT_SLUG}}_api:
+    build:
+      context: .
+      dockerfile: build/Dockerfile
+      target: final
+    image: {{IMAGE_NAME}}:local
+    ports:
+      - "3033:8080"
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__DefaultConnection: Host={{PROJECT_SLUG}}_pg_db;Port=5432;Database={{PROJECT_SLUG}};Username={{PROJECT_SLUG}}_user;Password={{PROJECT_SLUG}}_pass
+    depends_on:
+      {{PROJECT_SLUG}}_pg_db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
