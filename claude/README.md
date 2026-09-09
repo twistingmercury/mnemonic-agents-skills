@@ -102,6 +102,17 @@ Restart Claude Code after installation so it reloads agents, rules, and skills.
 
 ## Troubleshooting
 
+### Migrating the renamed .NET starter
+
+The installer preserves skill names absent from the catalog, so the old
+`dotnet-minimal-api-starter` symlink can remain broken after the rename to
+[`dotnet-postgres-api-starter`](../shared/skills/dotnet-postgres-api-starter/SKILL.md).
+Save any custom changes, then remove only the obsolete installed
+`dotnet-minimal-api-starter` entry from `SKILLS_DIR` when set, otherwise
+`~/.claude/skills`. Remove the link itself, leaving its target untouched.
+From the repository root, rerun `make install-claude` with the same destination
+configuration, then restart Claude Code.
+
 ### Agents or skills do not appear
 
 Rerun the installer and restart Claude Code. Agent and skill installations use

@@ -27,8 +27,10 @@ Usage: scaffold.sh --api-name NAME \
   [--project-slug SLUG] [--image-name IMAGE] \
   [--database-image-name IMAGE] [--ci-branch BRANCH]
 
-Render the complete minimal API repository template into the empty current
-working directory, which becomes the repository root.
+Render the complete minimal API repository template into the current working
+directory, which becomes the repository root. It must be empty except for real
+.git, .codex, .claude, or .agents directories, or a regular .git worktree file.
+Existing workspace metadata is preserved; symbolic links are not allowed.
 USAGE
 }
 
@@ -117,6 +119,38 @@ validate_ci_branch() {
     fi
 }
 
+validate_target_entries() {
+    local entry
+    local entry_name
+
+    for entry in "${TARGET}"/* "${TARGET}"/.[!.]* "${TARGET}"/..?*; do
+        if [ ! -e "${entry}" ] && [ ! -L "${entry}" ]; then
+            continue
+        fi
+
+        entry_name="${entry##*/}"
+
+        if [ -L "${entry}" ]; then
+            fail "blocking entry in the current working directory: ${entry_name} (symbolic links are not allowed)."
+        fi
+
+        case "${entry_name}" in
+            .git)
+                if [ -d "${entry}" ] || [ -f "${entry}" ]; then
+                    continue
+                fi
+                ;;
+            .codex|.claude|.agents)
+                if [ -d "${entry}" ]; then
+                    continue
+                fi
+                ;;
+        esac
+
+        fail "blocking entry in the current working directory: ${entry_name}; only .git, .codex, .claude, and .agents workspace metadata is allowed."
+    done
+}
+
 validate_target() {
     TARGET="$(pwd -P)" || fail 'cannot resolve the current working directory.'
 
@@ -124,9 +158,7 @@ validate_target() {
     [ "${TARGET}" != / ] || fail 'refusing to scaffold into the filesystem root.'
     [ -d "${TARGET}" ] || fail 'the current working directory must be an existing directory.'
 
-    if [ -n "$(find "${TARGET}" -mindepth 1 -maxdepth 1 -print -quit)" ]; then
-        fail 'the current working directory must be empty.'
-    fi
+    validate_target_entries
 }
 
 validate_configuration() {
@@ -255,9 +287,7 @@ install_tree() {
     local entry_name
     local destination
 
-    if [ -n "$(find "${TARGET}" -mindepth 1 -maxdepth 1 -print -quit)" ]; then
-        fail 'the current working directory stopped being empty during rendering.'
-    fi
+    validate_target_entries
 
     INSTALL_IN_PROGRESS="true"
 

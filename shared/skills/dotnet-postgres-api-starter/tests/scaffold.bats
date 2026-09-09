@@ -1,10 +1,14 @@
 #!/usr/bin/env bats
 
 setup() {
-    SCRIPT="/home/jeremy/.codex/skills/dotnet-minimal-api-starter/scripts/scaffold.sh"
+    SCRIPT="${BATS_TEST_DIRNAME}/../scripts/scaffold.sh"
     TEST_ROOT="${BATS_TEST_TMPDIR}/case"
     TARGET="${TEST_ROOT}/generated-api"
     mkdir -p "${TARGET}"
+}
+
+teardown() {
+    rm -rf -- "${TEST_ROOT}"
 }
 
 run_scaffold() {
@@ -35,6 +39,73 @@ directory_inode() {
     fi
 
     stat -f '%i' "$1"
+}
+
+prepare_ci_build_step() {
+    run_scaffold
+    [ "${status}" -eq 0 ]
+
+    awk '
+        /^      - name: Build and test the image$/ { step = 1; next }
+        step && /^      - / { exit }
+        step && /^        run: \|$/ { block = 1; next }
+        block && /^          / { sub(/^          /, ""); print }
+    ' "${TARGET}/.github/workflows/ci.yaml" > "${TEST_ROOT}/ci-build.sh"
+    [ -s "${TEST_ROOT}/ci-build.sh" ]
+
+    cat > "${TARGET}/build/build.sh" <<'SHIM'
+#!/usr/bin/env bash
+set -eu
+printf '%s\n' "${IMAGE_NAME}" "${LOCAL}" > "${CI_TEST_BUILD_RECORD}"
+SHIM
+    chmod +x "${TARGET}/build/build.sh"
+}
+
+run_ci_build_step() {
+    # Positional parameters are expanded by the subprocess after changing directory.
+    # shellcheck disable=SC2016
+    run env IMAGE_NAME="$1" GITHUB_REPOSITORY='Acme/Products' \
+        CI_TEST_BUILD_RECORD="${TEST_ROOT}/build-record" \
+        bash -c 'cd -- "$1" && exec bash --noprofile --norc -eo pipefail "$2"' _ \
+        "${TARGET}" "${TEST_ROOT}/ci-build.sh"
+}
+
+@test "CI defaults to a lowercase GHCR repository and invokes the CI builder" {
+    prepare_ci_build_step
+
+    run_ci_build_step ''
+
+    [ "${status}" -eq 0 ]
+    printf 'ghcr.io/acme/products\n0\n' > "${TEST_ROOT}/expected-build-record"
+    cmp "${TEST_ROOT}/expected-build-record" "${TEST_ROOT}/build-record"
+}
+
+@test "CI honors an explicit GHCR repository override" {
+    prepare_ci_build_step
+
+    run_ci_build_step 'ghcr.io/another-owner/service-images/products_api'
+
+    [ "${status}" -eq 0 ]
+    printf 'ghcr.io/another-owner/service-images/products_api\n0\n' > "${TEST_ROOT}/expected-build-record"
+    cmp "${TEST_ROOT}/expected-build-record" "${TEST_ROOT}/build-record"
+}
+
+@test "CI rejects non-GHCR tagged digest and uppercase image names before building" {
+    prepare_ci_build_step
+    local image_name
+
+    for image_name in \
+        'local/products' \
+        'registry.example/acme/products' \
+        'ghcr.io/acme/products:latest' \
+        'ghcr.io/acme/products@sha256:0123456789abcdef' \
+        'ghcr.io/Acme/Products'; do
+        run_ci_build_step "${image_name}"
+
+        [ "${status}" -ne 0 ]
+        [[ "${output}" == *'IMAGE_NAME must be a lowercase ghcr.io/<owner>/<image> repository without a tag or digest'* ]]
+        [ ! -e "${TEST_ROOT}/build-record" ]
+    done
 }
 
 @test "renders the complete repository with custom values into the current directory" {
@@ -204,18 +275,21 @@ CASES
     run_scaffold
 
     [ "${status}" -ne 0 ]
-    [[ "${output}" == *'the current working directory must be empty.'* ]]
+    [[ "${output}" == *'blocking entry in the current working directory: sentinel;'* ]]
     [ "$(cat "${TARGET}/sentinel")" = 'keep me' ]
     [ "$(find "${TARGET}" -mindepth 1 -maxdepth 1 | wc -l)" -eq 1 ]
     assert_no_staging_directory
 }
 
-@test "help explains that the empty current directory becomes the repository root" {
+@test "help explains the repository root and permitted workspace metadata" {
     run bash -c 'cd -- "$1" && shift && exec "$@"' _ "${TARGET}" "${SCRIPT}" --help
 
     [ "${status}" -eq 0 ]
-    [[ "${output}" == *'empty current'* ]]
-    [[ "${output}" == *'working directory'* ]]
+    [[ "${output}" == *'current working'* ]]
+    [[ "${output}" == *'empty except for real'* ]]
+    [[ "${output}" == *'.git, .codex, .claude, or .agents directories'* ]]
+    [[ "${output}" == *'regular .git worktree file'* ]]
+    [[ "${output}" == *'symbolic links are not allowed'* ]]
     [[ "${output}" == *'becomes the repository root'* ]]
     assert_empty_repository_root
     assert_no_staging_directory
@@ -245,5 +319,153 @@ CASES
     [ "${status}" -ne 0 ]
     [[ "${output}" == *'--resource-route requires a value.'* ]]
     assert_empty_repository_root
+    assert_no_staging_directory
+}
+
+@test "scaffolds alongside workspace metadata and preserves nested contents" {
+    local metadata
+    for metadata in .git .codex .claude .agents; do
+        mkdir -p "${TARGET}/${metadata}/nested"
+        printf '%s\n' "preserve ${metadata}" > "${TARGET}/${metadata}/nested/config"
+    done
+
+    run_scaffold
+
+    [ "${status}" -eq 0 ]
+    [ -f "${TARGET}/src/Catalog.Api/Program.cs" ]
+    for metadata in .git .codex .claude .agents; do
+        [ "$(cat "${TARGET}/${metadata}/nested/config")" = "preserve ${metadata}" ]
+        [ "$(find "${TARGET}/${metadata}" -type f | wc -l)" -eq 1 ]
+    done
+    assert_no_staging_directory
+}
+
+@test "scaffolds alongside a regular git worktree file without changing it" {
+    printf 'gitdir: /example/worktrees/catalog\n' > "${TARGET}/.git"
+    cp "${TARGET}/.git" "${TEST_ROOT}/expected-git"
+
+    run_scaffold
+
+    [ "${status}" -eq 0 ]
+    [ -f "${TARGET}/src/Catalog.Api/Program.cs" ]
+    cmp "${TEST_ROOT}/expected-git" "${TARGET}/.git"
+    assert_no_staging_directory
+}
+
+@test "rejects live and dangling metadata symlinks without changing their targets" {
+    local metadata
+    local link_target
+    mkdir -p "${TEST_ROOT}/existing"
+    printf 'external content\n' > "${TEST_ROOT}/existing/sentinel"
+
+    for metadata in .git .codex .claude .agents; do
+        for link_target in existing missing; do
+            ln -s "${TEST_ROOT}/${link_target}" "${TARGET}/${metadata}"
+
+            run_scaffold
+
+            [ "${status}" -ne 0 ]
+            [[ "${output}" == *"blocking entry in the current working directory: ${metadata} (symbolic links are not allowed)."* ]]
+            [ "$(readlink "${TARGET}/${metadata}")" = "${TEST_ROOT}/${link_target}" ]
+            [ "$(cat "${TEST_ROOT}/existing/sentinel")" = 'external content' ]
+            [ ! -e "${TEST_ROOT}/missing" ]
+            [ "$(find "${TARGET}" -mindepth 1 -maxdepth 1 | wc -l)" -eq 1 ]
+            assert_no_staging_directory
+            rm "${TARGET}/${metadata}"
+        done
+    done
+}
+
+@test "rejects unrecognized hidden directories while preserving all contents" {
+    mkdir -p "${TARGET}/.idea/nested" "${TARGET}/.git"
+    printf 'keep project settings\n' > "${TARGET}/.idea/nested/config"
+    printf 'keep git metadata\n' > "${TARGET}/.git/config"
+
+    run_scaffold
+
+    [ "${status}" -ne 0 ]
+    [[ "${output}" == *'blocking entry in the current working directory: .idea;'* ]]
+    [ "$(cat "${TARGET}/.idea/nested/config")" = 'keep project settings' ]
+    [ "$(cat "${TARGET}/.git/config")" = 'keep git metadata' ]
+    [ "$(find "${TARGET}" -mindepth 1 -maxdepth 1 | wc -l)" -eq 2 ]
+    assert_no_staging_directory
+}
+
+@test "rejects regular files using agent metadata directory names" {
+    local metadata
+    for metadata in .codex .claude .agents; do
+        printf 'keep file\n' > "${TARGET}/${metadata}"
+
+        run_scaffold
+
+        [ "${status}" -ne 0 ]
+        [[ "${output}" == *"blocking entry in the current working directory: ${metadata};"* ]]
+        [ "$(cat "${TARGET}/${metadata}")" = 'keep file' ]
+        [ "$(find "${TARGET}" -mindepth 1 -maxdepth 1 | wc -l)" -eq 1 ]
+        assert_no_staging_directory
+        rm "${TARGET}/${metadata}"
+    done
+}
+
+@test "rechecks the destination after staging and preserves newly present files" {
+    mkdir -p "${TEST_ROOT}/bin" "${TARGET}/.git"
+    printf 'keep git metadata\n' > "${TARGET}/.git/config"
+    export SCAFFOLD_TEST_MKTEMP
+    SCAFFOLD_TEST_MKTEMP="$(command -v mktemp)"
+    cat > "${TEST_ROOT}/bin/mktemp" <<'SHIM'
+#!/usr/bin/env bash
+set -eu
+"${SCAFFOLD_TEST_MKTEMP}" "$@"
+printf 'created during staging\n' > appeared.txt
+SHIM
+    chmod +x "${TEST_ROOT}/bin/mktemp"
+    export PATH="${TEST_ROOT}/bin:${PATH}"
+
+    run_scaffold
+
+    [ "${status}" -ne 0 ]
+    [[ "${output}" == *'blocking entry in the current working directory: appeared.txt;'* ]]
+    [ "$(cat "${TARGET}/appeared.txt")" = 'created during staging' ]
+    [ "$(cat "${TARGET}/.git/config")" = 'keep git metadata' ]
+    [ "$(find "${TARGET}" -mindepth 1 -maxdepth 1 | wc -l)" -eq 2 ]
+    assert_no_staging_directory
+}
+
+@test "an installation failure rolls back generated entries and preserves metadata" {
+    local metadata
+    for metadata in .git .codex .claude .agents; do
+        mkdir -p "${TARGET}/${metadata}/nested"
+        printf '%s\n' "preserve ${metadata}" > "${TARGET}/${metadata}/nested/config"
+    done
+    mkdir -p "${TEST_ROOT}/bin"
+    export SCAFFOLD_TEST_MV SCAFFOLD_TEST_MV_COUNT
+    SCAFFOLD_TEST_MV="$(command -v mv)"
+    SCAFFOLD_TEST_MV_COUNT="${TEST_ROOT}/mv-count"
+    cat > "${TEST_ROOT}/bin/mv" <<'SHIM'
+#!/usr/bin/env bash
+set -eu
+count=0
+if [ -f "${SCAFFOLD_TEST_MV_COUNT}" ]; then
+    read -r count < "${SCAFFOLD_TEST_MV_COUNT}"
+fi
+count=$((count + 1))
+printf '%s\n' "${count}" > "${SCAFFOLD_TEST_MV_COUNT}"
+if [ "${count}" -eq 2 ]; then
+    printf 'simulated move failure\n' >&2
+    exit 1
+fi
+exec "${SCAFFOLD_TEST_MV}" "$@"
+SHIM
+    chmod +x "${TEST_ROOT}/bin/mv"
+    export PATH="${TEST_ROOT}/bin:${PATH}"
+
+    run_scaffold
+
+    [ "${status}" -ne 0 ]
+    [[ "${output}" == *'could not install repository entry:'* ]]
+    [ "$(find "${TARGET}" -mindepth 1 -maxdepth 1 | wc -l)" -eq 4 ]
+    for metadata in .git .codex .claude .agents; do
+        [ "$(cat "${TARGET}/${metadata}/nested/config")" = "preserve ${metadata}" ]
+    done
     assert_no_staging_directory
 }

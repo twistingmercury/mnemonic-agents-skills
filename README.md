@@ -1,7 +1,7 @@
 # Claude Code and Codex Agent Ecosystem
 
 > **Maturity Level**: Basic - Ready for use and actively evolving.
-> **Version**: v1.2.1
+> **Version**: v1.3.1
 >
 > - **Emerging**: Prototype, not production-ready, expect breaking changes
 > - **Basic**: Production-ready but actively evolving, expect minor version changes
@@ -40,17 +40,25 @@ labels; each platform guide explains how those labels map to its agent names.
 
 Portable skills are shared across both integrations:
 
-| Skill                    | Purpose                                               |
-| ------------------------ | ----------------------------------------------------- |
-| `arch-docs`              | Create and update architecture documentation          |
-| `check-push-readiness`   | Assess committed changes before pushing               |
-| `code-review`            | Coordinate review across multiple concerns            |
-| `docker-first-ci`        | Implement and harden Docker-first CI/CD pipelines     |
-| `prime`                  | Survey a repository and build working context         |
-| `ralph-loop-docs-writer` | Create PRD and prompt files for iterative automation  |
-| `readme-writer`          | Create or update a README from a standard template    |
-| `rlm`                    | Run long-context tasks using a persistent local REPL  |
-| `shell-script`           | Create shell scripts with automatic BATS coverage     |
+| Skill                                                                               | Purpose                                                |
+| ----------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| `arch-docs`                                                                         | Create and update architecture documentation           |
+| `check-push-readiness`                                                              | Assess committed changes before pushing                |
+| `code-review`                                                                       | Coordinate review across multiple concerns             |
+| `docker-first-ci`                                                                   | Implement and harden Docker-first CI/CD pipelines      |
+| [`dotnet-postgres-api-starter`](shared/skills/dotnet-postgres-api-starter/SKILL.md) | Scaffold a complete .NET API and PostgreSQL repository |
+| `prime`                                                                             | Survey a repository and build working context          |
+| `ralph-loop-docs-writer`                                                            | Create PRD and prompt files for iterative automation   |
+| `readme-writer`                                                                     | Create or update a README from a standard template     |
+| `rlm`                                                                               | Run long-context tasks using a persistent local REPL   |
+| `shell-script`                                                                      | Create shell scripts with automatic BATS coverage      |
+
+The .NET PostgreSQL starter generates a complete repository targeting .NET 10,
+including Docker builds, tests, CI, and deployment assets. It has no
+application-only alternative. Invoke it in the intended project directory with
+no application files; the skill defines which existing Git and agent metadata
+it preserves. In the generated repository, run `make build-db` before
+`make build`: black-box tests reuse and preserve that database image.
 
 ## How it works
 
@@ -107,11 +115,18 @@ make help
 ### Testing
 
 With BATS, Python 3.11+, Bash 4+, rsync, and Make available, run both platform
-test suites from the repository root. Clear destination overrides so tests
+test suites from the repository root. `make test` runs only the platform suites;
+run shared skill tests separately. Clear destination overrides so platform tests
 use their temporary fixtures:
 
 ```bash
 env -u AGENTS_DIR -u SKILLS_DIR make test
+```
+
+Run the shared .NET PostgreSQL scaffold regression tests:
+
+```bash
+bats shared/skills/dotnet-postgres-api-starter/tests/scaffold.bats
 ```
 
 Run the shared RLM unit tests:

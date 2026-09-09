@@ -8,6 +8,17 @@ COMPOSE_FILE="${PROJECT_ROOT}/src/Tests/BlackBox/docker-compose.tests.yaml"
 COMPOSE_PROJECT_NAME="{{PROJECT_SLUG}}-blackbox"
 API_IMAGE_CREATED=0
 
+remove_test_image() {
+    local image_name="${COMPOSE_PROJECT_NAME}-tests:latest"
+    local image_ids
+
+    # A failed build may leave no test image. Shared database and supplied API
+    # images belong to their callers and must survive test cleanup.
+    image_ids="$(docker image ls --quiet --filter "reference=${image_name}")" || return $?
+    [ -n "${image_ids}" ] || return 0
+    docker image rm "${image_name}"
+}
+
 cleanup() {
     local status=$?
     local cleanup_status=0
@@ -17,7 +28,13 @@ cleanup() {
     docker compose --project-name "${COMPOSE_PROJECT_NAME}" --file "${COMPOSE_FILE}" \
         down --volumes --remove-orphans || cleanup_status=$?
 
+    remove_test_image || image_cleanup_status=$?
+    if [ "${cleanup_status}" -eq 0 ]; then
+        cleanup_status=${image_cleanup_status}
+    fi
+
     if [ "${API_IMAGE_CREATED}" -eq 1 ]; then
+        image_cleanup_status=0
         docker image rm "{{IMAGE_NAME}}:blackbox" || image_cleanup_status=$?
         if [ "${cleanup_status}" -eq 0 ]; then
             cleanup_status=${image_cleanup_status}
@@ -47,6 +64,21 @@ prepare_api_image() {
     API_IMAGE_CREATED=1
 }
 
+prepare_database_image() {
+    local image_reference="${DATABASE_IMAGE_NAME:-{{DATABASE_IMAGE_NAME}}}:test"
+    local image_id
+
+    if image_id="$(docker image inspect --format '{{.Id}}' "${image_reference}" 2>/dev/null)"; then
+        DATABASE_IMAGE="${image_id}"
+        export DATABASE_IMAGE
+        printf 'Running black-box tests against database image: %s\n' "${DATABASE_IMAGE}"
+        return 0
+    fi
+
+    printf 'Error: Database image not available locally: %s. Run make build-db first (with the same DATABASE_IMAGE_NAME, if overridden).\n' "${image_reference}" >&2
+    return 1
+}
+
 main() {
     if [ "$#" -ne 0 ]; then
         printf '%s\n' 'Usage: test-black-box.sh (no arguments)' >&2
@@ -62,12 +94,14 @@ main() {
         return 1
     }
 
+    prepare_database_image
+
     trap cleanup EXIT
     trap 'exit 130' INT
     trap 'exit 143' TERM
 
     prepare_api_image
-    docker compose --project-name "${COMPOSE_PROJECT_NAME}" --file "${COMPOSE_FILE}" build
+    docker compose --project-name "${COMPOSE_PROJECT_NAME}" --file "${COMPOSE_FILE}" build tests
     docker compose --project-name "${COMPOSE_PROJECT_NAME}" --file "${COMPOSE_FILE}" \
         up --detach --no-build --pull never database api
     docker compose --project-name "${COMPOSE_PROJECT_NAME}" --file "${COMPOSE_FILE}" \

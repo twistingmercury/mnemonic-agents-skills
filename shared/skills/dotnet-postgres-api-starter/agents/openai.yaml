@@ -1,0 +1,3 @@
+interface:
+  display_name: ".NET PostgreSQL API Starter"
+  short_description: "Scaffold a .NET API with PostgreSQL and Docker"

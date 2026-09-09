@@ -15,10 +15,13 @@ OpenAPI is available at `http://localhost:3033/openapi/v1.json` and Swagger UI a
 
 ```sh
 make analyze
+make build-db
 make build
 ```
 
-`make analyze` runs local .NET checks. `make build` performs the Docker-first build and black-box test path used in CI.
+`make analyze` runs local .NET checks. `make build-db` creates the seeded database image used by black-box tests; rerun it after changing database image inputs. `make build` performs the Docker-first build and black-box test path used in CI, using that existing database image.
+
+CI publishes the tested API image to `ghcr.io/<owner>/<repository>` using the lowercase GitHub repository name. To override it, set the GitHub repository variable `IMAGE_NAME` to a lowercase GHCR repository name without a tag or digest. Local image names are configured separately. For another registry, update the workflow's authentication and image configuration together.
 
 ## Kubernetes manifests
 

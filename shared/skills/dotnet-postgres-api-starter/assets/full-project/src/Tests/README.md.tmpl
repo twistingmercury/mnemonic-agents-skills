@@ -1,0 +1,16 @@
+# Tests
+
+Run unit tests directly:
+
+```sh
+dotnet test src/Tests/Unit/{{API_NAME}}.Tests.Unit.csproj
+```
+
+Run black-box tests against disposable containers:
+
+```sh
+make build-db
+./build/test-black-box.sh
+```
+
+Run these commands from the repository root. The runner requires the existing database `:test` image built by `make build-db` and preserves it after testing. Rebuild it when database image inputs change. Set `DATABASE_IMAGE_NAME` consistently for both commands to override the database image repository.

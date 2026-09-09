@@ -1,0 +1,278 @@
+#!/usr/bin/env bats
+
+setup() {
+    TEST_REPO="${BATS_TEST_TMPDIR}/repo"
+    TEST_BIN="${BATS_TEST_TMPDIR}/bin"
+    NO_GIT_BIN="${BATS_TEST_TMPDIR}/no-git-bin"
+    COMMAND_LOG="${BATS_TEST_TMPDIR}/commands.log"
+    COMPOSE_ENV_LOG="${BATS_TEST_TMPDIR}/compose-env.log"
+    export COMMAND_LOG COMPOSE_ENV_LOG
+    mkdir -p "${TEST_REPO}/build" "${TEST_REPO}/src/Tests/BlackBox" "${TEST_BIN}" \
+        "${NO_GIT_BIN}"
+    cp "${BATS_TEST_DIRNAME}/../build.sh" "${BATS_TEST_DIRNAME}/../test-black-box.sh" \
+        "${BATS_TEST_DIRNAME}/../Dockerfile" "${TEST_REPO}/build/"
+    cp "${BATS_TEST_DIRNAME}/../../src/Tests/BlackBox/docker-compose.tests.yaml" \
+        "${TEST_REPO}/src/Tests/BlackBox/"
+    cp "${BATS_TEST_DIRNAME}/../../Makefile" "${TEST_REPO}/"
+
+    cat > "${TEST_BIN}/git" <<'MOCK'
+#!/usr/bin/env bash
+if [ "$3" = rev-parse ]; then
+    if [ "${GIT_REV_PARSE_STATUS:-0}" -ne 0 ]; then
+        exit "${GIT_REV_PARSE_STATUS}"
+    fi
+    printf '%s\n' 0123456789abcdef
+    exit 0
+fi
+exit 1
+MOCK
+    cat > "${TEST_BIN}/docker" <<'MOCK'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "${COMMAND_LOG}"
+if [ "$1" = image ] && [ "$2" = inspect ]; then
+    if [ "${5:-}" = "${DATABASE_IMAGE_NAME:-{{DATABASE_IMAGE_NAME}}}:test" ]; then
+        if [ "${DATABASE_INSPECT_STATUS:-0}" -ne 0 ]; then
+            exit "${DATABASE_INSPECT_STATUS}"
+        fi
+        printf '%s\n' sha256:database
+    else
+        printf '%s\n' sha256:resolved
+    fi
+fi
+if [ "$1" = image ] && [ "$2" = ls ]; then
+    if [ "${IMAGE_LIST_STATUS:-0}" -ne 0 ]; then
+        exit "${IMAGE_LIST_STATUS}"
+    fi
+    if [ "${TEST_IMAGE_PRESENT:-1}" -eq 1 ]; then
+        printf '%s\n' sha256:testimage
+    fi
+fi
+if [ "$1" = image ] && [ "$2" = rm ]; then
+    exit "${IMAGE_REMOVE_STATUS:-0}"
+fi
+if [ "$1" = compose ]; then
+    printf 'DATABASE_IMAGE=%s API_IMAGE=%s\n' "${DATABASE_IMAGE:-}" "${API_IMAGE:-}" >> "${COMPOSE_ENV_LOG}"
+    case "${6:-}" in
+        build) exit "${COMPOSE_BUILD_STATUS:-0}" ;;
+        run) exit "${TEST_RUN_STATUS:-0}" ;;
+        down) exit "${COMPOSE_DOWN_STATUS:-0}" ;;
+    esac
+fi
+exit "${DOCKER_STATUS:-0}"
+MOCK
+    chmod +x "${TEST_BIN}/git" "${TEST_BIN}/docker"
+    ln -s "$(command -v bash)" "${NO_GIT_BIN}/bash"
+    ln -s "$(command -v dirname)" "${NO_GIT_BIN}/dirname"
+    ln -s "$(command -v make)" "${NO_GIT_BIN}/make"
+    ln -s "${TEST_BIN}/docker" "${NO_GIT_BIN}/docker"
+    export PATH="${TEST_BIN}:${PATH}"
+    unset API_IMAGE DOCKER_STATUS GIT_REV_PARSE_STATUS TEST_RUN_STATUS GITHUB_OUTPUT
+    unset TEST_IMAGE_PRESENT IMAGE_LIST_STATUS IMAGE_REMOVE_STATUS COMPOSE_BUILD_STATUS
+    unset COMPOSE_DOWN_STATUS DATABASE_IMAGE DATABASE_IMAGE_NAME DATABASE_INSPECT_STATUS
+}
+
+assert_test_image_cleanup() {
+    local down_line
+    local tests_line
+
+    grep -Fxq 'image rm {{PROJECT_SLUG}}-blackbox-tests:latest' "${COMMAND_LOG}"
+    down_line="$(grep -n 'down --volumes --remove-orphans$' "${COMMAND_LOG}" | cut -d: -f1)"
+    tests_line="$(grep -n '^image rm {{PROJECT_SLUG}}-blackbox-tests:latest$' "${COMMAND_LOG}" | cut -d: -f1)"
+    [ "${tests_line}" -gt "${down_line}" ]
+}
+
+assert_only_test_image_removed() {
+    local removed_images
+
+    removed_images="$(grep '^image rm ' "${COMMAND_LOG}")"
+    [ "${removed_images}" = 'image rm {{PROJECT_SLUG}}-blackbox-tests:latest' ]
+    [ "$(grep -Ec -- '--rmi|image prune|system prune' "${COMMAND_LOG}")" -eq 0 ]
+}
+
+@test "build.sh tags the image, resolves its ID, and runs black-box tests" {
+    export BUILD_DATE=2026-09-08T00:00:00Z
+
+    run "${TEST_REPO}/build/build.sh"
+
+    [ "${status}" -eq 0 ]
+    grep -Fq -- '--tag {{IMAGE_NAME}}:sha-0123456789abcdef' "${COMMAND_LOG}"
+    grep -Fq -- '--tag {{IMAGE_NAME}}:latest' "${COMMAND_LOG}"
+    grep -Fq 'image inspect --format {{.Id}} {{IMAGE_NAME}}:sha-0123456789abcdef' "${COMMAND_LOG}"
+    grep -Fq 'compose --project-name {{PROJECT_SLUG}}-blackbox' "${COMMAND_LOG}"
+}
+
+@test "make build succeeds without Git and uses local development tags" {
+    run env PATH="${NO_GIT_BIN}" BUILD_DATE=2026-09-08T00:00:00Z \
+        make -C "${TEST_REPO}" build
+
+    [ "${status}" -eq 0 ]
+    grep -Fq -- '--build-arg VERSION=development-local' "${COMMAND_LOG}"
+    grep -Fq -- '--build-arg COMMIT=development' "${COMMAND_LOG}"
+    grep -Fq -- '--tag {{IMAGE_NAME}}:development-local' "${COMMAND_LOG}"
+    grep -Fq -- '--tag {{IMAGE_NAME}}:latest-local' "${COMMAND_LOG}"
+    grep -Fq 'image inspect --format {{.Id}} {{IMAGE_NAME}}:development-local' \
+        "${COMMAND_LOG}"
+    grep -Fq 'run --rm --no-deps --pull never -T tests' "${COMMAND_LOG}"
+}
+
+@test "build.sh falls back to development metadata when Git has no HEAD" {
+    run env LOCAL=1 GIT_REV_PARSE_STATUS=128 BUILD_DATE=2026-09-08T00:00:00Z \
+        "${TEST_REPO}/build/build.sh"
+
+    [ "${status}" -eq 0 ]
+    grep -Fq -- '--build-arg VERSION=development-local' "${COMMAND_LOG}"
+    grep -Fq -- '--build-arg COMMIT=development' "${COMMAND_LOG}"
+    grep -Fq -- '--tag {{IMAGE_NAME}}:development-local' "${COMMAND_LOG}"
+    grep -Fq -- '--tag {{IMAGE_NAME}}:latest-local' "${COMMAND_LOG}"
+}
+
+@test "build.sh stops when the image build fails" {
+    run env DOCKER_STATUS=29 "${TEST_REPO}/build/build.sh"
+
+    [ "${status}" -eq 29 ]
+    [ "$(wc -l < "${COMMAND_LOG}")" -eq 1 ]
+}
+
+@test "test-black-box.sh builds, starts, tests, and cleans up" {
+    run "${TEST_REPO}/build/test-black-box.sh"
+
+    [ "${status}" -eq 0 ]
+    grep -Fq 'build --file' "${COMMAND_LOG}"
+    grep -Fq 'compose --project-name {{PROJECT_SLUG}}-blackbox' "${COMMAND_LOG}"
+    grep -Fq 'up --detach --no-build --pull never database api' "${COMMAND_LOG}"
+    grep -Fq 'run --rm --no-deps --pull never -T tests' "${COMMAND_LOG}"
+    grep -Fq 'down --volumes --remove-orphans' "${COMMAND_LOG}"
+    grep -Fxq 'image rm {{IMAGE_NAME}}:blackbox' "${COMMAND_LOG}"
+    assert_test_image_cleanup
+    [ "$(grep -c '^image rm ' "${COMMAND_LOG}")" -eq 2 ]
+}
+
+@test "test-black-box.sh preserves a test failure while still cleaning up" {
+    run env TEST_RUN_STATUS=17 "${TEST_REPO}/build/test-black-box.sh"
+
+    [ "${status}" -eq 17 ]
+    grep -Fq 'run --rm --no-deps --pull never -T tests' "${COMMAND_LOG}"
+    grep -Fq 'down --volumes --remove-orphans' "${COMMAND_LOG}"
+}
+
+@test "test-black-box.sh removes test images after a failed test run" {
+    run env API_IMAGE=example/api:release TEST_RUN_STATUS=17 \
+        "${TEST_REPO}/build/test-black-box.sh"
+
+    [ "${status}" -eq 17 ]
+    assert_test_image_cleanup
+    assert_only_test_image_removed
+}
+
+@test "test-black-box.sh preserves supplied API tags and SHA references" {
+    local api_image
+
+    for api_image in example/api:release sha256:0123456789abcdef; do
+        : > "${COMMAND_LOG}"
+        run env API_IMAGE="${api_image}" "${TEST_REPO}/build/test-black-box.sh"
+
+        [ "${status}" -eq 0 ]
+        grep -Fxq "image inspect --format {{.Id}} ${api_image}" "${COMMAND_LOG}"
+        [ "$(grep -c '^build ' "${COMMAND_LOG}")" -eq 0 ]
+        assert_test_image_cleanup
+        assert_only_test_image_removed
+    done
+}
+
+@test "test-black-box.sh cleans a partial build without removing missing images" {
+    run env API_IMAGE=example/api:release TEST_IMAGE_PRESENT=0 COMPOSE_BUILD_STATUS=23 \
+        "${TEST_REPO}/build/test-black-box.sh"
+
+    [ "${status}" -eq 23 ]
+    grep -Fq 'down --volumes --remove-orphans' "${COMMAND_LOG}"
+    [ "$(grep -c '^image rm ' "${COMMAND_LOG}")" -eq 0 ]
+    [ "$(grep -c 'run --rm' "${COMMAND_LOG}")" -eq 0 ]
+}
+
+@test "test-black-box.sh tolerates absent test images" {
+    run env API_IMAGE=example/api:release TEST_IMAGE_PRESENT=0 \
+        "${TEST_REPO}/build/test-black-box.sh"
+
+    [ "${status}" -eq 0 ]
+    grep -Fq 'down --volumes --remove-orphans' "${COMMAND_LOG}"
+    [ "$(grep -c '^image rm ' "${COMMAND_LOG}")" -eq 0 ]
+}
+
+@test "test-black-box.sh propagates image removal failures and attempts all cleanup" {
+    run env IMAGE_REMOVE_STATUS=31 "${TEST_REPO}/build/test-black-box.sh"
+
+    [ "${status}" -eq 31 ]
+    assert_test_image_cleanup
+    grep -Fxq 'image rm {{IMAGE_NAME}}:blackbox' "${COMMAND_LOG}"
+}
+
+@test "test-black-box.sh propagates image lookup failures" {
+    run env API_IMAGE=example/api:release IMAGE_LIST_STATUS=32 \
+        "${TEST_REPO}/build/test-black-box.sh"
+
+    [ "${status}" -eq 32 ]
+    [ "$(grep -c '^image ls ' "${COMMAND_LOG}")" -eq 1 ]
+    [ "$(grep -c '^image rm ' "${COMMAND_LOG}")" -eq 0 ]
+}
+
+@test "test-black-box.sh preserves compose cleanup failure over image cleanup failure" {
+    run env COMPOSE_DOWN_STATUS=33 IMAGE_REMOVE_STATUS=31 \
+        "${TEST_REPO}/build/test-black-box.sh"
+
+    [ "${status}" -eq 33 ]
+    assert_test_image_cleanup
+    grep -Fxq 'image rm {{IMAGE_NAME}}:blackbox' "${COMMAND_LOG}"
+}
+
+@test "test-black-box.sh preserves test failure over all cleanup failures" {
+    run env TEST_RUN_STATUS=17 COMPOSE_DOWN_STATUS=33 IMAGE_REMOVE_STATUS=31 \
+        "${TEST_REPO}/build/test-black-box.sh"
+
+    [ "${status}" -eq 17 ]
+    assert_test_image_cleanup
+    grep -Fxq 'image rm {{IMAGE_NAME}}:blackbox' "${COMMAND_LOG}"
+}
+
+@test "test-black-box.sh fails before building or cleanup when the database image is missing" {
+    run env DATABASE_INSPECT_STATUS=1 "${TEST_REPO}/build/test-black-box.sh"
+
+    [ "${status}" -eq 1 ]
+    [[ "${output}" == *'make build-db'* ]]
+    [[ "${output}" == *'{{DATABASE_IMAGE_NAME}}:test'* ]]
+    [ "$(cat "${COMMAND_LOG}")" = 'image inspect --format {{.Id}} {{DATABASE_IMAGE_NAME}}:test' ]
+    [ ! -e "${COMPOSE_ENV_LOG}" ]
+}
+
+@test "test-black-box.sh reuses the database image by immutable ID and builds only tests" {
+    run env API_IMAGE=example/api:release "${TEST_REPO}/build/test-black-box.sh"
+
+    [ "${status}" -eq 0 ]
+    [ "$(head -n 1 "${COMMAND_LOG}")" = 'image inspect --format {{.Id}} {{DATABASE_IMAGE_NAME}}:test' ]
+    grep -Fxq "compose --project-name {{PROJECT_SLUG}}-blackbox --file ${TEST_REPO}/src/Tests/BlackBox/docker-compose.tests.yaml build tests" "${COMMAND_LOG}"
+    [ "$(grep -c '^build ' "${COMMAND_LOG}")" -eq 0 ]
+    [ "$(grep -c ' build' "${COMMAND_LOG}")" -eq 1 ]
+    [ "$(sort -u "${COMPOSE_ENV_LOG}")" = 'DATABASE_IMAGE=sha256:database API_IMAGE=sha256:resolved' ]
+    assert_only_test_image_removed
+}
+
+@test "test-black-box.sh honors an overridden database image name" {
+    run env DATABASE_IMAGE_NAME=example/custom-db API_IMAGE=example/api:release \
+        "${TEST_REPO}/build/test-black-box.sh"
+
+    [ "${status}" -eq 0 ]
+    [ "$(head -n 1 "${COMMAND_LOG}")" = 'image inspect --format {{.Id}} example/custom-db:test' ]
+    [ "$(sort -u "${COMPOSE_ENV_LOG}")" = 'DATABASE_IMAGE=sha256:database API_IMAGE=sha256:resolved' ]
+    [ "$(grep -c '^build ' "${COMMAND_LOG}")" -eq 0 ]
+    assert_only_test_image_removed
+}
+
+@test "black-box Compose uses the database image without a database build context" {
+    local database_service
+
+    database_service="$(sed -n '/^  database:/,/^  api:/{ /^  api:/d; p; }' \
+        "${TEST_REPO}/src/Tests/BlackBox/docker-compose.tests.yaml")"
+    # Match the literal Compose interpolation expression.
+    # shellcheck disable=SC2016
+    [[ "${database_service}" == *'image: ${DATABASE_IMAGE:-{{DATABASE_IMAGE_NAME}}:test}'* ]]
+    [[ "${database_service}" != *'build:'* ]]
+}

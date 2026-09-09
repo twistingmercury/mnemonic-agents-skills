@@ -90,6 +90,17 @@ Restart Codex after installation so it reloads agents, rules, and skills.
 
 ## Troubleshooting
 
+### Migrating the renamed .NET starter
+
+The installer does not automatically remove skill names absent from the catalog,
+so an installed `dotnet-minimal-api-starter` copy can remain after the rename to
+[`dotnet-postgres-api-starter`](../shared/skills/dotnet-postgres-api-starter/SKILL.md).
+Save any custom changes, then remove only the obsolete
+`dotnet-minimal-api-starter` entry from your configured skills directory:
+`SKILLS_DIR` when set, otherwise `$CODEX_HOME/skills` (default `~/.codex/skills`).
+From the repository root, rerun `make install-codex` with the same destination
+configuration, then restart Codex.
+
 ### Agents, rules, or skills do not appear
 
 Installed copies of this catalog remain available after moving or removing the

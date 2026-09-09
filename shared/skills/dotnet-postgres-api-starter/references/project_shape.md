@@ -49,7 +49,7 @@ Use this as a structural guide, not a fixed domain template. The bundled `assets
 └── README.md
 ```
 
-Base API shape:
+API structure:
 
 1. `Program` registers OpenAPI, the database context, and handler interfaces; maps OpenAPI/UI and the resource endpoints.
 2. A resource extension method uses `MapGroup("/<resources>")`, assigns a tag, and maps its operations.

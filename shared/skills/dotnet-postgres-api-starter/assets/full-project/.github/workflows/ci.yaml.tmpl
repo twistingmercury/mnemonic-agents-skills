@@ -34,11 +34,23 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Build the database image
+        run: make build-db
+
       - name: Build and test the image
         id: build
         env:
-          IMAGE_NAME: {{IMAGE_NAME}}
-        run: LOCAL=0 ./build/build.sh
+          IMAGE_NAME: ${{ vars.IMAGE_NAME }}
+        shell: bash
+        run: |
+          export IMAGE_NAME="${IMAGE_NAME:-ghcr.io/${GITHUB_REPOSITORY,,}}"
+          repository_component='[a-z0-9]+(([._]|__|-+)[a-z0-9]+)*'
+          image_name_pattern="^ghcr\\.io/${repository_component}/${repository_component}(/${repository_component})*$"
+          if [[ ! "${IMAGE_NAME}" =~ ${image_name_pattern} ]]; then
+            printf '%s\n' 'IMAGE_NAME must be a lowercase ghcr.io/<owner>/<image> repository without a tag or digest; this workflow authenticates only to GHCR.' >&2
+            exit 1
+          fi
+          LOCAL=0 ./build/build.sh
 
       - name: Push the image built by CI
         if: github.ref == 'refs/heads/{{CI_BRANCH}}' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')

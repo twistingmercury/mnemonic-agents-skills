@@ -1,9 +1,0 @@
-using {{API_NAME}}.DataAccess.DTOs;
-using Microsoft.EntityFrameworkCore;
-
-namespace {{API_NAME}}.DataAccess;
-
-public class {{RESOURCE_SINGULAR}}DbContext(DbContextOptions<{{RESOURCE_SINGULAR}}DbContext> options) : DbContext(options)
-{
-    public DbSet<{{RESOURCE_SINGULAR}}Dto> {{RESOURCE_PLURAL}} => Set<{{RESOURCE_SINGULAR}}Dto>();
-}

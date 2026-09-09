@@ -1,8 +1,6 @@
 services:
   database:
-    build:
-      context: ../../../database
-      dockerfile: Dockerfile
+    image: ${DATABASE_IMAGE:-{{DATABASE_IMAGE_NAME}}:test}
     tmpfs:
       - /var/lib/postgresql
 

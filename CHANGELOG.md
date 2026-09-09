@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-09-09
+
+### Changed
+
+- Renamed `dotnet-minimal-api-starter` to `dotnet-postgres-api-starter` and removed
+  the `base-api` application-only alternative.
+- Black-box tests now require and preserve the existing database image produced
+  by `make build-db`; CI builds that image explicitly before `make build`.
+
+### Fixed
+
+- Scaffold rendering preserves supported Git and agent metadata while rejecting
+  existing application files.
+- Scaffold tests resolve the renderer relative to the checkout instead of a
+  hard-coded installed skill path.
+- Black-box cleanup removes the temporary test image after success or failure
+  while preserving supplied API and prebuilt database images.
+- CI defaults to a lowercase GHCR image name derived from the GitHub repository,
+  with an `IMAGE_NAME` repository-variable override, matching its GHCR login.
+
+## [1.3.0] - 2026-09-08
+
+### Added
+
+- Added a complete .NET 10 minimal API and PostgreSQL repository scaffold with
+  Docker builds, unit and black-box tests, Compose, CI, Helm, and Envoy assets.
+
 ## [1.2.1] - 2026-09-06
 
 ### Changed
