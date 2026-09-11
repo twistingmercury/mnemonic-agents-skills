@@ -48,7 +48,7 @@ Portable skills are shared across both integrations:
 | `docker-first-ci`                                                                   | Implement and harden Docker-first CI/CD pipelines      |
 | [`dotnet-postgres-api-starter`](shared/skills/dotnet-postgres-api-starter/SKILL.md) | Scaffold a complete .NET API and PostgreSQL repository |
 | `prime`                                                                             | Survey a repository and build working context          |
-| `ralph-loop-docs-writer`                                                            | Create PRD and prompt files for iterative automation   |
+| `ralph-loop-docs-writer`                                                            | Create numbered loop tasks, prompts, and activity-log instructions   |
 | `readme-writer`                                                                     | Create or update a README from a standard template     |
 | `rlm`                                                                               | Run long-context tasks using a persistent local REPL   |
 | `shell-script`                                                                      | Create shell scripts with automatic BATS coverage      |

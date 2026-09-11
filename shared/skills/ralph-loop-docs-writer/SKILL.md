@@ -1,120 +1,111 @@
 ---
 name: ralph-loop-docs-writer
-description: Create or update PRD.md and PROMPT.md files for agent-agnostic gralph loops driven by a checklist and a one-cycle execution prompt. Use when defining or maintaining iterative gralph automation.
+description: >-
+  Create or update LOOP_TASKS.md and LOOP_PROMPT.md for agent-agnostic Gralph
+  loops with numbered tasks, one-task execution, and Markdown activity logs.
+  Use when defining or maintaining iterative Gralph automation.
 ---
 
 # Ralph Loop Docs
 
-## Overview
+Generate a numbered task checklist and a self-contained one-attempt execution
+prompt. Respect the user's requested destination and project scope.
 
-A **ralph loop** drives the coding agent configured in `gralph` through a PRD checklist one item at a time. Before running a loop, inspect `gralph --help` and use the installed version's agent-selection and file-path options.
+## Runtime dependency
 
+These documents require Gralph support for task/attempt inputs and the activity
+result contract. That runner update is a dependency, not an already released
+feature. Generation can proceed before it is available. Before running a loop,
+inspect `gralph --help` and confirm the installed runner supports this contract.
+The intended invocation after that update is:
+
+```sh
+gralph -t LOOP_TASKS.md -p LOOP_PROMPT.md
 ```
-gralph --prompt PROMPT.md --prd PRD.md
-```
 
-Two files drive every loop:
-
-- **PRD.md** — machine-readable checklist of work cycles; gralph reads and advances it
-- **PROMPT.md** — per-iteration procedure telling the configured coding agent how to execute exactly one cycle
-
-These are NOT traditional documents. PRD.md is a checklist. PROMPT.md is a loop procedure, not a one-shot implementation prompt.
+The intended options are `--tasks`/`-t` and `--prompt`/`-p`. Gralph reports status
+to stdout. Agents maintain activity logs; there is no progress-file input or
+`--progress` option. Preserve any existing progress files.
 
 ## Published-document preservation
 
-Before editing supporting generated documentation, inspect Git history and upstream or remote-tracking refs. Preserve published standalone documents by creating the next snake_case version with synchronized `Version`, `Date`, and `Notes` metadata. If publication status is uncertain, treat committed documents as published. `PRD.md` and `PROMPT.md` are intentional canonical workflow files whose fixed paths are required by gralph, so they may be updated in place and retain their capitalization.
+Before editing supporting generated documentation, inspect Git history and
+upstream or remote-tracking refs. Preserve published standalone documents by
+creating the next snake_case version with synchronized `Version`, `Date`, and
+`Notes` metadata. If publication status is uncertain, treat committed documents
+as published. `LOOP_TASKS.md` and `LOOP_PROMPT.md` are intentional canonical
+living workflow files: update them in place without version suffixes and retain
+their capitalization. Other generated workflow filenames use lowercase
+snake_case.
 
-## PRD.md
+## Generate the pair
 
-### Purpose
+1. Read the repository's instructions and relevant design/build documents.
+   Establish the requested scope and destination. Resolve the actual paths of
+   both output documents; do not assume they live in the repository root.
+2. Read [the task template](templates/loop_tasks_template.md),
+   [the prompt template](templates/loop_prompt_template.md),
+   [the activity contract](references/activity_log_v1.md), and
+   [the activity template](templates/activity_log_template.md).
+3. Write `LOOP_TASKS.md` using the task template's section order. Assign unique
+   positive integers at creation: `- [ ] **Task 1 - Title**: Description.`
+   Preserve assigned numbers on updates, including completed or abandoned tasks;
+   never infer identity from checklist position. The task list is the only
+   checklist in the document. Use ordinary bullets elsewhere.
+4. Write `LOOP_PROMPT.md` using the prompt template's section order, ten rules,
+   and eight-step procedure. Customize project inputs, build rules, and Verify
+   checks. Replace `TASK_CHECKLIST_PATH` and `EXECUTION_INSTRUCTIONS_PATH` with
+   the actual resolved document paths, including inside the embedded frontmatter.
+   Quote/escape paths appropriately in prose, YAML, and shell examples.
+5. Replace `ACTIVITY_LOG_TEMPLATE_BODY` with the activity template's frontmatter
+   and Markdown body, omitting its HTML guidance and terminal marker. Keep this
+   body inside the prompt's fenced example. Leave only invocation-time fields
+   for the executing agent to fill. The generated prompt must contain the full
+   runtime contract and activity body; it must not depend on the installed skill
+   or refer the executing agent to these template/reference files.
+6. Check the generated pair for unresolved generation placeholders, unique task
+   numbers, a single task checklist, executable verification commands, correct
+   paths, and the failure/cleanup procedure. Report the two output paths and the
+   compatible-runner dependency.
 
-A gralph-processable checklist. Each unchecked item (`- [ ]`) is processed in order. Gralph marks items `- [x]` (complete) or `- [~]` (abandoned after max iterations).
+## Task requirements
 
-### Required Sections
+Keep the task template's eight sections and opening processing note. Every task
+has six fields: numbered title/description, Agent, Files, Steps, Verify, and Done.
 
-See `templates/PRD-template.md` for the full template.
+- Agent: use the exact registered role when available; execution may fall back
+  to that role directly if subagents are unavailable.
+- Files: list source and supporting files the task will change. The runtime
+  activity log is always permitted and stays outside task commits.
+- Steps: use bounded imperative actions. Name temporary resources and cleanup
+  needs when relevant; do not add infrastructure to tasks that need none.
+- Verify: supply a runnable command that exits zero on success. Source changes
+  need appropriate tests; do not add tests for documentation-only changes.
+- Done: define observable verification and cleanup outcomes.
 
-**Section order:**
+One task delivers one independently verifiable capability with one assigned
+agent. Split tasks that span more than about six files or multiple independent
+verification goals. Keep existing `- [x]` and `- [~]` states; only Gralph's finite
+retry policy may abandon an implementation failure. Agents must not skip a
+blocker or mark failed work complete.
 
-1. Objective
-2. Problem Statement
-3. Success Criteria
-4. Scope (In scope / Out of scope)
-5. Constraints and Decisions
-6. Implementation Plan (cycles)
-7. Risks and Mitigations
-8. Definition of Done
+## Updating existing workflows
 
-The opening italicized note is required — it explains how `gralph` processes the document.
+Installing this skill does not rewrite existing projects. In authorized
+projects, migrate `PRD.md` and `PROMPT.md` to the canonical names and update their
+references and invocation examples together. Preserve project-specific content,
+assigned task numbers, completion state, and existing progress/history files.
+If both old and new pairs exist, inspect and reconcile them; do not blindly
+overwrite either pair. Remove progress-file read/write/commit instructions from
+the generated prompt. Migrate prompts before using the updated runner: missing
+activity results stop the run.
 
-### Cycle Format
+## Common mistakes
 
-Every cycle under `## Implementation Plan` must have all six fields:
-
-```markdown
-- [ ] **Cycle N - <short title>**: <one-sentence description>.
-  - Agent: `<agent-name>`
-  - Files: `<file1>`, `<file2>`
-  - Steps:
-    - <atomic action>
-    - <atomic action>
-  - Verify: `<runnable command that exits 0 on success>`
-  - Done: <observable exit condition tied to the Verify command>
-```
-
-| Field  | Rules                                                  |
-| ------ | ------------------------------------------------------ |
-| Agent  | Use exact subagent name available in the repo          |
-| Files  | Every file the cycle creates or modifies               |
-| Steps  | Imperative, one atomic action per line                 |
-| Verify | Copy-pasteable command; must exit 0 on success         |
-| Done   | Concrete observable state — not a restatement of Steps |
-
-### Cycle Sizing Rules
-
-- One cycle = one independently verifiable capability
-- One agent per cycle
-- Cycles producing source files must include a test in Verify
-- If a cycle touches more than ~6 files or needs multiple independent verify commands, split it
-
-## PROMPT.md
-
-### Purpose
-
-Per-iteration instructions. The configured coding agent reads this at the start of every `gralph` invocation, selects the first unchecked PRD cycle, executes it, verifies, commits, updates the PRD, and stops.
-
-### Required Sections
-
-See `templates/PROMPT-template.md` for the full template.
-
-**Section order:**
-
-1. Objective (complete one cycle, update records, stop)
-2. Inputs (PRD path, progress log path, supporting docs)
-3. Non-Negotiable Rules (the 10 rules — keep verbatim)
-4. Repo-Specific Build and Test Rules
-5. Ralph Loop Procedure (8 steps — keep structure, customize Step 5)
-6. Failure Modes to Avoid
-7. Output Contract
-
-### What to Customize
-
-| Section             | What to change                                     |
-| ------------------- | -------------------------------------------------- |
-| Inputs              | Set paths to PRD.md, progress.txt, key design docs |
-| Repo-Specific Rules | Language, toolchain, build path                    |
-| Step 5 Verify       | Add baseline checks for the tech stack             |
-
-The Non-Negotiable Rules and 8-step procedure structure stay the same across projects.
-
-## Common Mistakes
-
-| Mistake                                | Fix                                                                    |
-| -------------------------------------- | ---------------------------------------------------------------------- |
-| PRD with no `- [ ]` markers            | gralph only processes these markers — every cycle must have one        |
-| Done = restatement of Steps            | Done must be tied to the Verify command output                         |
-| PROMPT.md as one-shot generator        | Must say "complete exactly one cycle" and include the 8-step procedure |
-| Cycles that are too large              | If a cycle takes multiple gralph runs to finish, split it              |
-| No Verify command                      | Every cycle needs a runnable command exiting 0 on success              |
-| Vague agent name                       | Use the exact subagent name registered in the repo                     |
-| Missing progress log path in PROMPT.md | The coding agent needs to know where to append the progress entry      |
+- Multiple checklists or positional task numbers: use one numbered task list.
+- A one-shot implementation prompt: execute only the task supplied by Gralph.
+- Hardcoded runtime identity or log paths: use each invocation's supplied values.
+- An activity template left outside the prompt: embed the body and runtime rules.
+- Logging only success: start before task work and record failed actions too.
+- Reporting completion before cleanup or commits: finalize those first.
+- Reading only chat output: the final result belongs in the activity Markdown.
