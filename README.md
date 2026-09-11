@@ -53,6 +53,22 @@ Portable skills are shared across both integrations:
 | `rlm`                                                                               | Run long-context tasks using a persistent local REPL   |
 | `shell-script`                                                                      | Create shell scripts with automatic BATS coverage      |
 
+The [code-review skill](shared/skills/code-review/SKILL.md) writes reports by
+default to `./local/code_review_YYYY_mm_dd_vN.md` in the reviewed repository.
+Versions increment across all reviews on the same date; each review and
+re-review creates a new file without overwriting earlier reports.
+
+Findings use stable IDs and describe the trigger, impact, code location,
+evidence, recommended change, and observable acceptance checks. Reports use
+`ACCEPTABLE`, `CHANGES_REQUIRED`, or `INCOMPLETE` verdicts, with assessment
+completeness recorded separately as `COMPLETE` or `INCOMPLETE`. An open finding
+or failed required check requires changes; missing required evidence or
+independent reviewers prevents acceptance. The skill defines the full report
+format, disposition requirements, and verdict rules. Reviews account for explicit
+user concerns and relevant test groups, disclosing sampling and omissions.
+Re-reviews reconcile every prior finding with evidence; a finding that was not
+rediscovered remains open until its disposition is justified.
+
 The .NET PostgreSQL starter generates a complete repository targeting .NET 10,
 including Docker builds, tests, CI, and deployment assets. It has no
 application-only alternative. Invoke it in the intended project directory with

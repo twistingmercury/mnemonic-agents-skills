@@ -42,13 +42,13 @@ PY
     [ "$status" -eq 1 ]
 }
 
-@test "generated code-review paths use snake_case" {
+@test "generated code-review paths use dated local snake_case names" {
     run grep -R -F --include='*.md' -- 'docs/code-reviews/' \
         "${REPO_ROOT}/claude/agents" "${REPO_ROOT}/codex/agents" \
         "${REPO_ROOT}/shared/skills"
     [ "$status" -eq 1 ]
 
-    run grep -F -- 'docs/code_reviews/phase_09_routing_engine_v01.md' \
+    run grep -F -- './local/code_review_2026_09_11_v1.md' \
         "${REPO_ROOT}/shared/skills/code-review/SKILL.md"
     [ "$status" -eq 0 ]
 }

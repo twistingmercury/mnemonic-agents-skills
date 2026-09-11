@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.2] - 2026-09-11
+
+### Changed
+
+- Strengthened code reviews to trace production behavior, inspect observability,
+  assess test value and missing regression coverage, and challenge unnecessary
+  complexity across staged, unstaged, and untracked changes.
+- Required independent review perspectives, evidence-backed finding dispositions,
+  re-review of fixes, and explicit verdict and assessment-completeness rules.
+- Standardized reports with stable finding IDs, concrete triggers and impact,
+  code locations, remediation guidance, observable acceptance checks, and
+  verification evidence tied to the reviewed candidate.
+- Changed the default report path to `./local/code_review_YYYY_mm_dd_vN.md`,
+  allocating a new version for every review and re-review without overwriting
+  earlier reports.
+- Required explicit coverage of user concerns and relevant test groups, with
+  inspected cases, sampling limits, and material omissions recorded.
+- Required re-reviews to reconcile every prior finding, preserving identifiers
+  and evidence so missed findings cannot silently disappear.
+- Updated the report template, README guidance, and document-naming test to
+  match the revised review workflow.
+
 ## [1.3.1] - 2026-09-09
 
 ### Changed
