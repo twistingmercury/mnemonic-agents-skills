@@ -1,7 +1,7 @@
 # Claude Code and Codex Agent Ecosystem
 
 > **Maturity Level**: Basic - Ready for use and actively evolving.
-> **Version**: v1.3.1
+> **Version**: v1.4.0
 >
 > - **Emerging**: Prototype, not production-ready, expect breaking changes
 > - **Basic**: Production-ready but actively evolving, expect minor version changes
@@ -48,7 +48,7 @@ Portable skills are shared across both integrations:
 | `docker-first-ci`                                                                   | Implement and harden Docker-first CI/CD pipelines      |
 | [`dotnet-postgres-api-starter`](shared/skills/dotnet-postgres-api-starter/SKILL.md) | Scaffold a complete .NET API and PostgreSQL repository |
 | `prime`                                                                             | Survey a repository and build working context          |
-| `ralph-loop-docs-writer`                                                            | Create PRD and prompt files for iterative automation   |
+| `ralph-loop-docs-writer`                                                            | Create YAML tasks, checkpoints, logs, and JSON results |
 | `readme-writer`                                                                     | Create or update a README from a standard template     |
 | `rlm`                                                                               | Run long-context tasks using a persistent local REPL   |
 | `shell-script`                                                                      | Create shell scripts with automatic BATS coverage      |
@@ -76,6 +76,24 @@ no application files; the skill defines which existing Git and agent metadata
 it preserves. In the generated repository, run `make build-db` before
 `make build`: black-box tests reuse and preserve that database image.
 
+The [Ralph loop docs writer](shared/skills/ralph-loop-docs-writer/SKILL.md)
+generates a typed `LOOP_TASKS.yaml` and a self-contained `LOOP_PROMPT.md`. This
+edition requires a YAML-capable Gralph runtime — `gralph` with `--tasks`/`-t`,
+`--prompt`/`-p`, and `--dry-run` — or another loop process that implements the
+same contract: runtime-owned task status, agent-owned checkpoints, a reserved
+Markdown activity log, and a separate JSON result. Validate a generated pair
+with its actual paths before relying on it:
+
+```bash
+gralph -t LOOP_TASKS.yaml -p LOOP_PROMPT.md --dry-run
+```
+
+Validation is verified against gralph v0.5.22; older installations may lack YAML
+input or dry-run support. An unavailable runner, an unsupported option, or a
+nonzero exit is a blocker, not a pass. Installing the skill does not migrate
+existing projects; the superseded Markdown-checklist resources are retained in
+`_archive/ralph_loop_docs_writer/` outside the installed package.
+
 ## How it works
 
 Each integration follows the same three-phase model:
@@ -93,12 +111,10 @@ produce artifacts; the main client integrates the result.
 This is a reference implementation, not a framework. Adapt prompts and routing
 rules to the needs of each project.
 
-Claude Code installs agent and skill symlinks that remain connected to this
-checkout, so keep it in a stable location or rerun installation after moving it.
-Codex installs local copies of this catalog that remain usable after moving or
-removing the checkout; rerun its installer to refresh managed content from an
-updated checkout. Review potential name conflicts and existing global guidance
-before installation.
+Both platforms install copies of agent definitions and skills that remain usable
+after moving or removing the checkout. Rerun the installer to refresh your
+installation with updates from an updated checkout. Review potential name
+conflicts and existing global guidance before installation.
 
 Naming, configuration precedence, preservation rules, and destinations differ
 by platform. Read the [Claude Code guide](claude/README.md) or
@@ -130,24 +146,18 @@ make help
 
 ### Testing
 
-With BATS, Python 3.11+, Bash 4+, rsync, and Make available, run both platform
-test suites from the repository root. `make test` runs only the platform suites;
-run shared skill tests separately. Clear destination overrides so platform tests
-use their temporary fixtures:
+With BATS, Python 3.11+, Bash 4+, and Make available, run the test suites from
+the repository root:
 
 ```bash
-env -u AGENTS_DIR -u SKILLS_DIR make test
+make test
 ```
 
-Run the shared .NET PostgreSQL scaffold regression tests:
+This runs the shared .NET PostgreSQL scaffold regression tests and shared RLM
+unit tests. Separately, you may also run them directly:
 
 ```bash
 bats shared/skills/dotnet-postgres-api-starter/tests/scaffold.bats
-```
-
-Run the shared RLM unit tests:
-
-```bash
 (cd shared/skills/rlm && python3 -m unittest discover -s tests -v)
 ```
 

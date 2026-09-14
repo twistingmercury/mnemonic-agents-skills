@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-09-14
+
+### Changed
+
+- Both Claude Code and Codex installers now use plain `cp`/`install` to create
+  local copies of agents and skills instead of symlinks. This allows installed
+  content to remain usable after moving or removing the repository checkout.
+- Installed copies no longer track the checkout, so the installer must be rerun
+  to pick up repository updates.
+- Codex installer no longer requires `rsync`. Running the test suites requires
+  BATS, Python 3.11+, Bash 4+, and Make.
+
+### Removed
+
+- Claude Code and Codex no longer maintain installer test suites (`claude/tests/`,
+  `codex/tests/`, `make test-claude`, and `make test-codex` targets have been
+  deleted). The shared skill test suites remain and are run via `make test`.
+- Codex manifest-based preservation contract and the `$CODEX_HOME/.mnemonic-agents-skills/managed-paths`
+  manifest file. Agents and skills installed from the repository are still
+  overwritten on update, but stale copies from renamed or removed repository
+  entries must be manually deleted.
+- `codex/install/lib/` helper scripts (`managed_state.sh`, `materialize_file.sh`).
+- The `FORCE` flag from Claude Code and Codex agent and skill installers
+  (`01_install_agents.sh`, `03_install_skills.sh`). The `FORCE` flag remains
+  in `02_install_global_agents.sh` for the global-rules phase.
+
+## [1.3.3] - 2026-09-14
+
+### Changed
+
+- Updated `ralph-loop-docs-writer` to generate typed `LOOP_TASKS.yaml` and a
+  self-contained `LOOP_PROMPT.md`, with Gralph-owned status, agent checkpoints,
+  Markdown activity logs, and separate JSON results.
+- Unified embedded activity and JSON examples with their standalone templates;
+  clarified best-effort failure finalization and bounded validation retries.
+- Added explicit state-preserving migration and moved legacy resources outside
+  the installed package into `_archive/ralph_loop_docs_writer/`. Installation
+  leaves existing project workflows unchanged.
+
 ## [1.3.2] - 2026-09-11
 
 ### Changed

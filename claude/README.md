@@ -79,19 +79,22 @@ Run a single phase when troubleshooting or developing an installer:
 ./claude/install/03_install_skills.sh
 ```
 
-Set `FORCE=1` to refresh current repository-managed links and reinstall a
-managed rules block even when its date is current:
+Set `FORCE=1` to reinstall a managed rules block even when its date is current:
 
 ```bash
-FORCE=1 ./claude/install/install.sh
+FORCE=1 ./claude/install/02_install_global_agents.sh
 ```
 
 ### Preservation behavior
 
-- Agent and skill names absent from the repository catalog are preserved,
-  except broken agent symlinks, which are removed.
-- Agent or skill paths whose basenames collide with repository-managed content
-  may be replaced. Back up custom content with a colliding name first.
+- Agent and skill names absent from the repository catalog are preserved. An
+  agent or skill whose name collides with a repository-managed one is
+  overwritten. Local edits to installed copies are overwritten on the next run.
+- An agent or skill that is renamed or removed from the repository leaves a stale
+  copy behind in the destination. There is no automatic pruning; you must delete
+  it manually.
+- Broken symlinks left by previous installations are swept out; the installer
+  replaces the skill directory wholesale with `cp -R`.
 - The global-rules phase creates `~/.claude/CLAUDE.md.<timestamp>.backup` when
   adding rules to an existing file without a managed block or replacing a block
   with a readable installed date.
@@ -104,20 +107,19 @@ Restart Claude Code after installation so it reloads agents, rules, and skills.
 
 ### Migrating the renamed .NET starter
 
-The installer preserves skill names absent from the catalog, so the old
-`dotnet-minimal-api-starter` symlink can remain broken after the rename to
+The installer preserves skill names absent from the catalog, so an installed
+`dotnet-minimal-api-starter` copy can remain after the rename to
 [`dotnet-postgres-api-starter`](../shared/skills/dotnet-postgres-api-starter/SKILL.md).
-Save any custom changes, then remove only the obsolete installed
+Save any custom changes, then remove the obsolete installed
 `dotnet-minimal-api-starter` entry from `SKILLS_DIR` when set, otherwise
-`~/.claude/skills`. Remove the link itself, leaving its target untouched.
-From the repository root, rerun `make install-claude` with the same destination
-configuration, then restart Claude Code.
+`~/.claude/skills`. From the repository root, rerun `make install-claude` with
+the same destination configuration, then restart Claude Code.
 
 ### Agents or skills do not appear
 
-Rerun the installer and restart Claude Code. Agent and skill installations use
-symlinks, so moving the checkout makes those links stale. Rerunning the
-installer from the checkout's new location repairs repository-managed links.
+Rerun the installer and restart Claude Code. Moving or deleting the checkout
+does not break an existing installation, but the installer must be rerun to
+pick up repository updates.
 
 ### Global rules were overwritten
 
@@ -135,15 +137,11 @@ Confirm that `~/.claude` exists and is writable, then rerun:
 
 ## Testing
 
-The installer suite requires BATS, Bash, and Make. From the repository root,
-clear destination overrides so tests use their temporary fixtures:
-
-```bash
-env -u AGENTS_DIR -u SKILLS_DIR make test-claude
-```
-
-With ShellCheck installed, validate installer shell scripts separately:
+With ShellCheck installed, validate the installer shell scripts:
 
 ```bash
 shellcheck claude/install/*.sh
 ```
+
+Run the shared test suites from the repository root using `make test`; see the
+[root README](../README.md#testing) for details.
