@@ -1,0 +1,4 @@
+interface:
+  display_name: "Capture Requirements"
+  short_description: "Capture software requirements for architecture handoff"
+  default_prompt: "Use $capture-requirements to help me define software project requirements and prepare a handoff for architecture and design."

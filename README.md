@@ -1,7 +1,7 @@
 # Claude Code and Codex Agent Ecosystem
 
 > **Maturity Level**: Basic - Ready for use and actively evolving.
-> **Version**: v1.4.0
+> **Version**: v1.5.0
 >
 > - **Emerging**: Prototype, not production-ready, expect breaking changes
 > - **Basic**: Production-ready but actively evolving, expect minor version changes
@@ -40,18 +40,19 @@ labels; each platform guide explains how those labels map to its agent names.
 
 Portable skills are shared across both integrations:
 
-| Skill                                                                               | Purpose                                                |
-| ----------------------------------------------------------------------------------- | ------------------------------------------------------ |
-| `arch-docs`                                                                         | Create and update architecture documentation           |
-| `check-push-readiness`                                                              | Assess committed changes before pushing                |
-| `code-review`                                                                       | Coordinate review across multiple concerns             |
-| `docker-first-ci`                                                                   | Implement and harden Docker-first CI/CD pipelines      |
-| [`dotnet-postgres-api-starter`](shared/skills/dotnet-postgres-api-starter/SKILL.md) | Scaffold a complete .NET API and PostgreSQL repository |
-| `prime`                                                                             | Survey a repository and build working context          |
-| `ralph-loop-docs-writer`                                                            | Create YAML tasks, checkpoints, logs, and JSON results |
-| `readme-writer`                                                                     | Create or update a README from a standard template     |
-| `rlm`                                                                               | Run long-context tasks using a persistent local REPL   |
-| `shell-script`                                                                      | Create shell scripts with automatic BATS coverage      |
+| Skill                                                                               | Purpose                                                  |
+| ----------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| [`arch-docs`](shared/skills/arch-docs/SKILL.md)                                     | Create and update architecture documentation             |
+| [`capture-requirements`](shared/skills/capture-requirements/SKILL.md)               | Capture requirements for architecture and design handoff |
+| [`check-push-readiness`](shared/skills/check-push-readiness/SKILL.md)               | Assess committed changes before pushing                  |
+| [`code-review`](shared/skills/code-review/SKILL.md)                                 | Coordinate review across multiple concerns               |
+| [`docker-first-ci`](shared/skills/docker-first-ci/SKILL.md)                         | Implement and harden Docker-first CI/CD pipelines        |
+| [`dotnet-postgres-api-starter`](shared/skills/dotnet-postgres-api-starter/SKILL.md) | Scaffold a complete .NET API and PostgreSQL repository   |
+| [`prime`](shared/skills/prime/SKILL.md)                                             | Survey a repository and build working context            |
+| [`ralph-loop-docs-writer`](shared/skills/ralph-loop-docs-writer/SKILL.md)           | Create YAML tasks, checkpoints, logs, and JSON results   |
+| [`readme-writer`](shared/skills/readme-writer/SKILL.md)                             | Create or update a README from a standard template       |
+| [`rlm`](shared/skills/rlm/SKILL.md)                                                 | Run long-context tasks using a persistent local REPL     |
+| [`shell-script`](shared/skills/shell-script/SKILL.md)                               | Create shell scripts with automatic BATS coverage        |
 
 The [code-review skill](shared/skills/code-review/SKILL.md) writes reports by
 default to `./local/code_review_YYYY_mm_dd_vN.md` in the reviewed repository.
