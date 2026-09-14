@@ -33,8 +33,6 @@ precedence over the global registry.
 
 - Codex is installed.
 - Bash 4 or newer is available.
-- `rsync` is available on `PATH`; the installer uses it to copy managed
-  content and stops with an actionable error when it is unavailable.
 - Make is available if using the Make targets below.
 - The configured `CODEX_HOME` location, or its parent when it does not yet
   exist, is writable.
@@ -71,20 +69,16 @@ content:
 
 ### Preservation behavior
 
-- The installer records its managed paths beneath `CODEX_HOME`. Ordinary
-  reruns refresh those manifest-owned copies and preserve untracked collisions.
-  Local edits to managed copies are overwritten during refresh.
-- Existing agent files, skills, or `$CODEX_HOME/AGENTS.md` that are not in that
-  manifest are preserved, as are unrelated symlinks.
-- Recognized legacy repository symlinks are migrated to local copies. This
-  includes the previous repository layouts for agents, skills, and global
-  rules; unrelated links remain untouched.
-- Each skill is copied with `rsync -a` into a new temporary directory. After
-  copying succeeds, the installer removes the existing managed skill directory
-  and moves the staged copy into its place. Replacement removes stale files,
-  including local additions inside that managed directory; unrelated paths
-  outside it remain preserved. Staging does not provide rollback if replacement
-  fails.
+- An agent or skill whose name is not in the repository catalog is preserved.
+  An agent or skill whose name collides with a repository-managed one is
+  overwritten. Local edits to installed copies are overwritten on the next run.
+- An agent or skill that is renamed or removed from the repository leaves a stale
+  copy behind in the destination. There is no automatic pruning; you must delete
+  it manually.
+- Broken symlinks left by previous installations are swept out; the installer
+  replaces the skill directory wholesale with `cp -R`.
+- Each skill is copied as a complete directory; replacement removes stale files
+  within that directory but preserves unrelated paths outside it.
 
 Restart Codex after installation so it reloads agents, rules, and skills.
 
@@ -92,14 +86,14 @@ Restart Codex after installation so it reloads agents, rules, and skills.
 
 ### Migrating the renamed .NET starter
 
-The installer does not automatically remove skill names absent from the catalog,
-so an installed `dotnet-minimal-api-starter` copy can remain after the rename to
+Because there is no automatic pruning, an installed `dotnet-minimal-api-starter`
+copy can remain after the rename to
 [`dotnet-postgres-api-starter`](../shared/skills/dotnet-postgres-api-starter/SKILL.md).
-Save any custom changes, then remove only the obsolete
-`dotnet-minimal-api-starter` entry from your configured skills directory:
-`SKILLS_DIR` when set, otherwise `$CODEX_HOME/skills` (default `~/.codex/skills`).
-From the repository root, rerun `make install-codex` with the same destination
-configuration, then restart Codex.
+Save any custom changes, then remove the obsolete `dotnet-minimal-api-starter`
+entry from your configured skills directory: `SKILLS_DIR` when set, otherwise
+`$CODEX_HOME/skills` (default `~/.codex/skills`). From the repository root,
+rerun `make install-codex` with the same destination configuration, then
+restart Codex.
 
 ### Agents, rules, or skills do not appear
 
@@ -124,16 +118,11 @@ active.
 
 ## Testing
 
-The validation and installer suite requires BATS, Python 3.11 or newer, Bash,
-rsync, and Make. From the repository root, clear destination overrides so tests
-use their temporary fixtures:
+With ShellCheck installed, validate the installer shell scripts:
 
 ```bash
-env -u AGENTS_DIR -u SKILLS_DIR make test-codex
+shellcheck codex/install/*.sh
 ```
 
-With ShellCheck installed, validate the installer scripts and shared helpers:
-
-```bash
-shellcheck codex/install/*.sh codex/install/lib/*.sh
-```
+Run the shared test suites from the repository root using `make test`; see the
+[root README](../README.md#testing) for details.

@@ -1,7 +1,7 @@
 # Claude Code and Codex Agent Ecosystem
 
 > **Maturity Level**: Basic - Ready for use and actively evolving.
-> **Version**: v1.3.3
+> **Version**: v1.4.0
 >
 > - **Emerging**: Prototype, not production-ready, expect breaking changes
 > - **Basic**: Production-ready but actively evolving, expect minor version changes
@@ -111,12 +111,10 @@ produce artifacts; the main client integrates the result.
 This is a reference implementation, not a framework. Adapt prompts and routing
 rules to the needs of each project.
 
-Claude Code installs agent and skill symlinks that remain connected to this
-checkout, so keep it in a stable location or rerun installation after moving it.
-Codex installs local copies of this catalog that remain usable after moving or
-removing the checkout; rerun its installer to refresh managed content from an
-updated checkout. Review potential name conflicts and existing global guidance
-before installation.
+Both platforms install copies of agent definitions and skills that remain usable
+after moving or removing the checkout. Rerun the installer to refresh your
+installation with updates from an updated checkout. Review potential name
+conflicts and existing global guidance before installation.
 
 Naming, configuration precedence, preservation rules, and destinations differ
 by platform. Read the [Claude Code guide](claude/README.md) or
@@ -148,24 +146,18 @@ make help
 
 ### Testing
 
-With BATS, Python 3.11+, Bash 4+, rsync, and Make available, run both platform
-test suites from the repository root. `make test` runs only the platform suites;
-run shared skill tests separately. Clear destination overrides so platform tests
-use their temporary fixtures:
+With BATS, Python 3.11+, Bash 4+, and Make available, run the test suites from
+the repository root:
 
 ```bash
-env -u AGENTS_DIR -u SKILLS_DIR make test
+make test
 ```
 
-Run the shared .NET PostgreSQL scaffold regression tests:
+This runs the shared .NET PostgreSQL scaffold regression tests and shared RLM
+unit tests. Separately, you may also run them directly:
 
 ```bash
 bats shared/skills/dotnet-postgres-api-starter/tests/scaffold.bats
-```
-
-Run the shared RLM unit tests:
-
-```bash
 (cd shared/skills/rlm && python3 -m unittest discover -s tests -v)
 ```
 
