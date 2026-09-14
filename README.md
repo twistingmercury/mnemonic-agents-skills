@@ -1,7 +1,7 @@
 # Claude Code and Codex Agent Ecosystem
 
 > **Maturity Level**: Basic - Ready for use and actively evolving.
-> **Version**: v1.3.1
+> **Version**: v1.3.3
 >
 > - **Emerging**: Prototype, not production-ready, expect breaking changes
 > - **Basic**: Production-ready but actively evolving, expect minor version changes
@@ -48,7 +48,7 @@ Portable skills are shared across both integrations:
 | `docker-first-ci`                                                                   | Implement and harden Docker-first CI/CD pipelines      |
 | [`dotnet-postgres-api-starter`](shared/skills/dotnet-postgres-api-starter/SKILL.md) | Scaffold a complete .NET API and PostgreSQL repository |
 | `prime`                                                                             | Survey a repository and build working context          |
-| `ralph-loop-docs-writer`                                                            | Create numbered loop tasks, prompts, and activity-log instructions   |
+| `ralph-loop-docs-writer`                                                            | Create YAML tasks, checkpoints, logs, and JSON results |
 | `readme-writer`                                                                     | Create or update a README from a standard template     |
 | `rlm`                                                                               | Run long-context tasks using a persistent local REPL   |
 | `shell-script`                                                                      | Create shell scripts with automatic BATS coverage      |
@@ -75,6 +75,24 @@ application-only alternative. Invoke it in the intended project directory with
 no application files; the skill defines which existing Git and agent metadata
 it preserves. In the generated repository, run `make build-db` before
 `make build`: black-box tests reuse and preserve that database image.
+
+The [Ralph loop docs writer](shared/skills/ralph-loop-docs-writer/SKILL.md)
+generates a typed `LOOP_TASKS.yaml` and a self-contained `LOOP_PROMPT.md`. This
+edition requires a YAML-capable Gralph runtime — `gralph` with `--tasks`/`-t`,
+`--prompt`/`-p`, and `--dry-run` — or another loop process that implements the
+same contract: runtime-owned task status, agent-owned checkpoints, a reserved
+Markdown activity log, and a separate JSON result. Validate a generated pair
+with its actual paths before relying on it:
+
+```bash
+gralph -t LOOP_TASKS.yaml -p LOOP_PROMPT.md --dry-run
+```
+
+Validation is verified against gralph v0.5.22; older installations may lack YAML
+input or dry-run support. An unavailable runner, an unsupported option, or a
+nonzero exit is a blocker, not a pass. Installing the skill does not migrate
+existing projects; the superseded Markdown-checklist resources are retained in
+`_archive/ralph_loop_docs_writer/` outside the installed package.
 
 ## How it works
 

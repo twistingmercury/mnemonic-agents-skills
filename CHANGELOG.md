@@ -7,23 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.3] - 2026-09-14
+
 ### Changed
 
-- Updated `ralph-loop-docs-writer` to generate `LOOP_TASKS.md` and
-  `LOOP_PROMPT.md`, with explicitly numbered tasks in a single checklist and
-  document paths resolved from the user's requested destination.
-- Replaced generated progress-file instructions with per-attempt Markdown
-  activity logs containing YAML frontmatter, resource and cleanup records,
-  verification results, and a terminal `continue`, `blocked`, or `finished` result.
-  Gralph status is directed to stdout.
-- Renamed the task and prompt templates to lowercase snake_case and added the
-  activity-log template and contract reference. Generated prompts embed the
-  activity instructions so execution does not depend on the skill installation.
-- Added bounded failure and commit handling, including verification-only tasks
-  and previously committed work that need no new task commit.
-- Documented migration from existing loop documents and the dependency on the
-  forthcoming Gralph activity contract and `--tasks`/`-t`, `--prompt`/`-p` options.
-  This skill update does not implement those Gralph runtime changes.
+- Updated `ralph-loop-docs-writer` to generate typed `LOOP_TASKS.yaml` and a
+  self-contained `LOOP_PROMPT.md`, with Gralph-owned status, agent checkpoints,
+  Markdown activity logs, and separate JSON results.
+- Unified embedded activity and JSON examples with their standalone templates;
+  clarified best-effort failure finalization and bounded validation retries.
+- Added explicit state-preserving migration and moved legacy resources outside
+  the installed package into `_archive/ralph_loop_docs_writer/`. Installation
+  leaves existing project workflows unchanged.
 
 ## [1.3.2] - 2026-09-11
 

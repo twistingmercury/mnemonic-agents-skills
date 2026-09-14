@@ -1,0 +1,55 @@
+# Version: v02
+# Date: 2026-09-12
+# Notes: Typed YAML task template with stable IDs and recovery checkpoints.
+# Target output: LOOP_TASKS.yaml. See loop_prompt_template_v02.md for execution.
+# Requires a compatible YAML-capable Gralph binary.
+#
+# Generator: replace every GENERATE_* token with project-specific content.
+# Copy the task entry for each bounded, independently verifiable deliverable.
+# Assign positive unique IDs and preserve existing IDs, order, terminal states,
+# and checkpoints during an authorized migration. New tasks start pending with
+# an empty checkpoint. Omit agent if no specialist is needed; otherwise use its
+# exact registered name. This label does not route the configured executable.
+# Put all execution instructions in prompt, never only in these comments.
+# Gralph owns status: pending, in_progress, completed, abandoned.
+# During execution, the agent changes only its selected task's checkpoint.
+# Generate LOOP_PROMPT.md from loop_prompt_template_v02.md alongside this file.
+# Validate before claiming runtime readiness, using actual shell-quoted paths:
+# gralph -t LOOP_TASKS.yaml -p LOOP_PROMPT.md --dry-run
+# An unavailable validator or unsupported option is a blocker, not a pass.
+tasks:
+  - id: 1
+    title: "GENERATE_SHORT_TASK_TITLE"
+    status: pending
+    agent: "GENERATE_REGISTERED_AGENT_NAME_OR_OMIT_FIELD"
+    checkpoint: ""
+    prompt: |
+      Objective:
+      GENERATE_ONE_SENTENCE_DELIVERABLE_AND_PROJECT_CONTEXT
+
+      Scope and files:
+      - GENERATE_EXACT_SOURCE_OR_SUPPORTING_PATHS_AND_ALLOWED_CHANGES
+      - GENERATE_RELEVANT_DEPENDENCIES_CONSTRAINTS_AND_NON_GOALS
+      - The selected checkpoint, supplied activity log, and final JSON result
+        are permitted attempt outputs under the shared execution procedure.
+
+      Steps:
+      1. Inspect the listed files, relevant project instructions, and supplied
+         checkpoint. Verify prior work against the actual workspace.
+      2. GENERATE_BOUNDED_IMPLEMENTATION_ACTIONS_FOR_THIS_DELIVERABLE
+      3. Run the verification below; record exact results and evidence.
+      4. GENERATE_REQUIRED_RESOURCE_CLEANUP_OR_EXPLICIT_NO_RESOURCES_STATEMENT
+      5. Record verified progress and remaining work in the selected checkpoint.
+         Preserve every task status and all other YAML fields. Finalize the
+         human log and separate JSON result using the shared procedure.
+
+      Verification:
+      - Working directory: GENERATE_ACTUAL_VERIFICATION_DIRECTORY
+      - Command: GENERATE_RUNNABLE_COMMAND_THAT_EXITS_ZERO_ON_SUCCESS
+      - Expected outcome: GENERATE_OBSERVABLE_SUCCESS_CONDITION
+
+      Completion criteria:
+      - GENERATE_CONCRETE_DELIVERED_BEHAVIOR_AND_RELEVANT_ACCEPTANCE_CHECKS
+      - Required verification succeeds and attempt-owned cleanup is verified.
+      - Required source-work commits follow the shared project policy.
+      - Report the selected task outcome; Gralph alone updates task status.

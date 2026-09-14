@@ -14,32 +14,25 @@ execution_instructions: "EXECUTION_INSTRUCTIONS_PATH"
 <!--
 Generation: fill TASK_CHECKLIST_PATH and EXECUTION_INSTRUCTIONS_PATH with the
 actual paths of the generated documents, quoting and escaping YAML strings.
-Runtime instructions: copy the frontmatter and body WITHOUT the result marker
-when starting an attempt. Replace placeholders with Gralph's supplied task/attempt
-numbers and log path; never infer them from an older log or overwrite that log.
-Write one Markdown (.md) file, such as task_1_attempt_3.md. Its terminal marker
-belongs at the bottom of this same file, not in a separate JSON artifact.
-Update this file throughout the attempt. Use None or Not run, with a reason,
+Runtime instructions: Gralph reserves an empty Markdown log. Initialize only
+that assigned current attempt file before task work, then update it throughout
+the attempt. Replace placeholders with Gralph's supplied task/attempt numbers and
+log path; never infer them from an older log or overwrite prior logs/results.
+Write one Markdown (.md) file, such as task_1_attempt_3.md. The separate supplied
+result file, task_1_attempt_3_result.json, must not exist until finalization.
+Update this log throughout the attempt. Use None or Not run, with a reason,
 where appropriate; do not fabricate activity or evidence to fill a section.
 Remove template guidance and replace or remove unused placeholder entries before
 finalizing the log. Keep ended_at null while active; set it to the actual end
 timestamp with timezone at finalization. Use positive integers for frontmatter
-task and attempt, matching the result marker. Quote and escape YAML strings.
-Frontmatter and body provide context; Gralph parses only the terminal marker.
-Keep the entire log within 1 MiB and the marker within 4 KiB. Reference larger
-outputs by path. Preserve this log and evidence outside task commits.
-Append the fully substituted marker only after cleanup, required checklist
-updates, and commits have been attempted and their outcomes recorded.
-TASK_NUMBER and ATTEMPT_NUMBER must become supplied positive JSON integers.
-DISPOSITION must become continue, blocked, or finished. Replace SUMMARY with
-a nonempty JSON-escaped string. Placeholder tokens are not a valid result.
-Use continue only when safe to advance or retry an unchecked implementation
-failure; finished only when no open items remain and cleanup/checks succeeded.
-Completion through continue or finished requires successful process exit.
-Use blocked for infrastructure failure, uncertainty, incomplete cleanup, or
-unsafe commit failure. Retention must not disguise incomplete cleanup.
-Include exactly one result marker, outside a code fence, as the final nonblank
-line. Do not append it while work is still in progress.
+task and attempt, matching the result JSON. Quote and escape YAML strings.
+Frontmatter and body provide human context; Gralph does not parse this log.
+Reference larger outputs by path. Preserve logs, results, and evidence outside
+task commits.
+Only after cleanup, required checklist updates, and commit attempts have been
+recorded and ended_at set, create the supplied result file exclusively. Use the
+JSON output contract embedded in the execution prompt; do not add a result
+marker to this Markdown. Do not create a placeholder or overwrite a result.
 -->
 
 ## Activity
@@ -100,6 +93,3 @@ Separately identify preserved source changes, Git state, and evidence below.
 - Commit outcome: COMMIT_REFERENCE_OR_FAILURE_OR_NOT_REQUIRED
 - Cleanup outcome: COMPLETE_OR_UNRESOLVED_WITH_REASON
 - Final disposition and reason: DISPOSITION_AND_REASON
-
-<!-- markdownlint-disable MD013 -->
-GRALPH_RESULT {"version":1,"task":TASK_NUMBER,"attempt":ATTEMPT_NUMBER,"disposition":"DISPOSITION","summary":"SUMMARY"}

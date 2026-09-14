@@ -1,111 +1,131 @@
 ---
 name: ralph-loop-docs-writer
 description: >-
-  Create or update LOOP_TASKS.md and LOOP_PROMPT.md for agent-agnostic Gralph
-  loops with numbered tasks, one-task execution, and Markdown activity logs.
+  Create or update LOOP_TASKS.yaml and LOOP_PROMPT.md for agent-agnostic Gralph
+  loops with typed tasks, recovery checkpoints, Markdown logs, and JSON results.
   Use when defining or maintaining iterative Gralph automation.
 ---
 
 # Ralph Loop Docs
 
-Generate a numbered task checklist and a self-contained one-attempt execution
-prompt. Respect the user's requested destination and project scope.
+Generate typed YAML tasks and a self-contained one-attempt execution prompt.
+Respect the user's destination, project scope, verification, and commit policies.
 
-## Runtime dependency
+## Target runtime and validation
 
-These documents require Gralph support for task/attempt inputs and the activity
-result contract. That runner update is a dependency, not an already released
-feature. Generation can proceed before it is available. Before running a loop,
-inspect `gralph --help` and confirm the installed runner supports this contract.
-The intended invocation after that update is:
+These templates target Gralph's YAML runtime with Gralph-owned task status,
+agent-owned checkpoints, and `completed`, `retry`, and `blocked` results.
+Validate each generated pair with a compatible binary; older installations may
+lack YAML input or dry-run support. Generation can succeed even when runtime
+validation is unavailable, but that does not establish readiness to run.
+
+Inspect `gralph --help` for YAML input and read-only `--dry-run` support. After
+generating the pair, validate using its actual paths:
 
 ```sh
-gralph -t LOOP_TASKS.md -p LOOP_PROMPT.md
+gralph -t LOOP_TASKS.yaml -p LOOP_PROMPT.md --dry-run
 ```
 
-The intended options are `--tasks`/`-t` and `--prompt`/`-p`. Gralph reports status
-to stdout. Agents maintain activity logs; there is no progress-file input or
-`--progress` option. Preserve any existing progress files.
+Correct fixable validation errors and retry once. Stop and report unresolved
+repeated errors rather than retrying indefinitely. An unavailable runner,
+unsupported option, or nonzero exit is a validation failure or blocker, never
+successful validation. Report generated design artifacts separately from this
+blocker; do not claim they are ready to run. YAML syntax checks supplement but
+cannot replace the compatible runner's typed validation.
+
+Dry-run validates every task and the shared prompt without launching agents,
+executing task verification, changing YAML, or reserving artifacts. It does not
+certify the task's prose or eventual success. Once validation succeeds, the
+intended execution command uses the same inputs without `--dry-run`.
 
 ## Published-document preservation
 
-Before editing supporting generated documentation, inspect Git history and
-upstream or remote-tracking refs. Preserve published standalone documents by
-creating the next snake_case version with synchronized `Version`, `Date`, and
-`Notes` metadata. If publication status is uncertain, treat committed documents
-as published. `LOOP_TASKS.md` and `LOOP_PROMPT.md` are intentional canonical
-living workflow files: update them in place without version suffixes and retain
-their capitalization. Other generated workflow filenames use lowercase
-snake_case.
+Inspect Git history and remote-tracking refs before editing generated supporting
+documents. Preserve published standalone documents by creating the next
+snake_case version with synchronized `Version`, `Date`, and `Notes` metadata.
+Treat committed documents as published when publication is uncertain.
+`LOOP_TASKS.yaml` and `LOOP_PROMPT.md` are canonical living workflow files; update
+them in place when authorized. Historical resources are retained outside the installed package in the source
+repository archive. Generate workflows only from the four v02 resources below.
 
 ## Generate the pair
 
-1. Read the repository's instructions and relevant design/build documents.
-   Establish the requested scope and destination. Resolve the actual paths of
-   both output documents; do not assume they live in the repository root.
-2. Read [the task template](templates/loop_tasks_template.md),
-   [the prompt template](templates/loop_prompt_template.md),
-   [the activity contract](references/activity_log_v1.md), and
-   [the activity template](templates/activity_log_template.md).
-3. Write `LOOP_TASKS.md` using the task template's section order. Assign unique
-   positive integers at creation: `- [ ] **Task 1 - Title**: Description.`
-   Preserve assigned numbers on updates, including completed or abandoned tasks;
-   never infer identity from checklist position. The task list is the only
-   checklist in the document. Use ordinary bullets elsewhere.
-4. Write `LOOP_PROMPT.md` using the prompt template's section order, ten rules,
-   and eight-step procedure. Customize project inputs, build rules, and Verify
-   checks. Replace `TASK_CHECKLIST_PATH` and `EXECUTION_INSTRUCTIONS_PATH` with
-   the actual resolved document paths, including inside the embedded frontmatter.
-   Quote/escape paths appropriately in prose, YAML, and shell examples.
-5. Replace `ACTIVITY_LOG_TEMPLATE_BODY` with the activity template's frontmatter
-   and Markdown body, omitting its HTML guidance and terminal marker. Keep this
-   body inside the prompt's fenced example. Leave only invocation-time fields
-   for the executing agent to fill. The generated prompt must contain the full
-   runtime contract and activity body; it must not depend on the installed skill
-   or refer the executing agent to these template/reference files.
-6. Check the generated pair for unresolved generation placeholders, unique task
-   numbers, a single task checklist, executable verification commands, correct
-   paths, and the failure/cleanup procedure. Report the two output paths and the
-   compatible-runner dependency.
+1. Read repository instructions and relevant design/build documents. Establish
+   scope, output destination, actual document paths, and project verification
+   and Git policies. Do not add automatic commits where none are required.
+2. Read [the YAML task template](templates/loop_tasks_template_v02.yaml),
+   [the prompt template](templates/loop_prompt_template_v02.md),
+   [the JSON result template](templates/activity_result_template_v02.json), and
+   [the human log template](templates/activity_log_template_v02.md).
+3. Write `LOOP_TASKS.yaml` with a top-level `tasks` sequence. Each task has a
+   stable positive integer `id`, nonblank `title`, `status`, optional `agent`,
+   string `checkpoint`, and nonblank block-scalar `prompt`. New tasks start
+   `pending` with an empty checkpoint. Assign unique IDs independent of order.
+4. Put scope, steps, runnable verification, and completion criteria inside each
+   task's prompt. Preserve project-specific instructions. YAML comments are not
+   durable task instructions: rewriting typed YAML may discard them.
+5. Write `LOOP_PROMPT.md` from the v02 prompt template. Insert the complete
+   contents inside the standalone activity template’s Markdown fence at
+   `GENERATE_ACTIVITY_LOG_BODY`, omitting its metadata and generator guidance.
+   Insert the standalone JSON template contents at `GENERATE_RESULT_EXAMPLE`.
+   Its four example values are illustrative, never runtime defaults. Replace
+   remaining `GENERATE_*` tokens with project content and actual task/prompt
+   paths; quote and escape YAML paths, including spaces and special characters.
+   Omit prompt metadata and generator guidance. Preserve all execution sections
+   so the generated pair works without the skill installation. Retain
+   `RUNTIME_*` tokens only in the embedded log, where the agent is instructed to
+   fill them from its invocation. Generation creates only the pair, never an
+   activity reservation or result file.
+6. Check YAML syntax, unique IDs, allowed statuses, nonblank titles/prompts, and
+   at most one `in_progress` task. Validate all tasks, including terminal tasks.
+   `tasks: []` is valid when there is no work. Check paths, runnable verification
+   commands, safe cleanup instructions, and preservation of project policies.
+7. Run the compatible runner's dry-run and correct errors. Report both output
+   paths, validation command and result, and any compatibility blocker. Do not
+   launch the loop merely to validate generated artifacts.
 
-## Task requirements
+## Task scope and ownership
 
-Keep the task template's eight sections and opening processing note. Every task
-has six fields: numbered title/description, Agent, Files, Steps, Verify, and Done.
+One task delivers one independently verifiable capability. Use an exact
+registered specialist name when appropriate; the optional `agent` label conveys
+intent and does not select an executable. Keep task prompts focused and split
+independent goals. Verification commands must fit the target repository; do not
+invent passes or require source tests for documentation-only changes.
 
-- Agent: use the exact registered role when available; execution may fall back
-  to that role directly if subagents are unavailable.
-- Files: list source and supporting files the task will change. The runtime
-  activity log is always permitted and stays outside task commits.
-- Steps: use bounded imperative actions. Name temporary resources and cleanup
-  needs when relevant; do not add infrastructure to tasks that need none.
-- Verify: supply a runnable command that exits zero on success. Source changes
-  need appropriate tests; do not add tests for documentation-only changes.
-- Done: define observable verification and cleanup outcomes.
+Gralph supplies the complete selected prompt, checkpoint, task ID, attempt,
+YAML path, and artifact paths. The agent executes only that task; it does not
+search for the next task or alter status. Gralph persists `in_progress` before
+launch and alone applies terminal status from the accepted result and retry
+policy. The agent atomically updates only the selected checkpoint, preserving
+all other task values. Checkpoints describe verified progress, remaining work,
+and recovery needs; they never authorize completion.
 
-One task delivers one independently verifiable capability with one assigned
-agent. Split tasks that span more than about six files or multiple independent
-verification goals. Keep existing `- [x]` and `- [~]` states; only Gralph's finite
-retry policy may abandon an implementation failure. Agents must not skip a
-blocker or mark failed work complete.
+The agent initializes Gralph's reserved empty human log before work, records
+activity throughout, and exclusively creates the supplied JSON result only
+after cleanup and finalization attempts. Completion requires successful
+checkpoint and log writes; persistence failure uses best-effort remaining writes
+and a blocked result when supplied identity and result publication permit it. Gralph does not parse the human log. Preserve previous artifacts,
+source changes, evidence, Git state, and shared resources. Runtime log/result
+outputs and the selected checkpoint are permitted alongside scoped task work.
+No progress-file instructions or Gralph Git automation are introduced. Preserve
+existing progress/history files and honor project policies for source commits;
+never instruct the agent to commit a Gralph status transition.
 
-## Updating existing workflows
+## Explicit migration
 
-Installing this skill does not rewrite existing projects. In authorized
-projects, migrate `PRD.md` and `PROMPT.md` to the canonical names and update their
-references and invocation examples together. Preserve project-specific content,
-assigned task numbers, completion state, and existing progress/history files.
-If both old and new pairs exist, inspect and reconcile them; do not blindly
-overwrite either pair. Remove progress-file read/write/commit instructions from
-the generated prompt. Migrate prompts before using the updated runner: missing
-activity results stop the run.
+Installing this skill does not migrate existing projects. Migrate only when
+requested. Inventory both old and new inputs before editing: written task IDs,
+sequence, full instructions, policies, states, and checkpoints. Map Markdown
+`[ ]` to `pending`, `[x]`/`[X]` to `completed`, and `[~]` to `abandoned`.
+Preserve existing YAML states (including terminal states), IDs, order, prompts,
+and checkpoints; initialize only new checkpoints to the empty string.
 
-## Common mistakes
-
-- Multiple checklists or positional task numbers: use one numbered task list.
-- A one-shot implementation prompt: execute only the task supplied by Gralph.
-- Hardcoded runtime identity or log paths: use each invocation's supplied values.
-- An activity template left outside the prompt: embed the body and runtime rules.
-- Logging only success: start before task work and record failed actions too.
-- Reporting completion before cleanup or commits: finalize those first.
-- Reading only chat output: the final result belongs in the activity Markdown.
+Report ambiguous or duplicate IDs and conflicting old/new pairs; stop that
+migration instead of silently renumbering or choosing one file as authoritative.
+Do not infer `in_progress` or completion from logs, results, or checkpoint prose.
+Compare source and target inventories before updating links: every task must
+retain its identity, meaning, state, and recovery context. Retain the original
+Markdown task history and existing progress/history files. Update shared prompt
+and invocation examples together only after reconciliation, then validate with
+actual paths. Report generated design files separately from unavailable runtime
+validation, including missing tooling, unsupported flags, or unresolved errors.

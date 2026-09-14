@@ -5,7 +5,7 @@ Execute one Ralph loop attempt for `[repository]` using the rules below.
 ## Objective
 
 Work on exactly one supplied task, verify it, clean up attempt resources, update
-its checklist state when successful, finalize the activity log, and stop.
+its checklist state when successful, finalize the activity log and JSON result, and stop.
 
 ## Inputs
 
@@ -13,12 +13,14 @@ its checklist state when successful, finalize the activity log, and stop.
 - Execution instructions: `EXECUTION_INSTRUCTIONS_PATH`.
 - Supporting documents: [Populate actual relevant paths or None.]
 - Repository working tree and relevant retained activity logs.
-- Gralph-supplied task number, attempt number, and absolute activity log path.
+- Gralph-supplied task number, attempt number, absolute activity log path, and
+  absolute result file path.
 
-Use only this invocation's supplied identity and path. Numbers are positive
+Use only this invocation's supplied identity and paths. Numbers are positive
 integers; task numbers come from written task headings, never list position.
-Do not derive runtime values from old logs or overwrite an earlier attempt.
-Gralph generates logs in its invocation directory, independently of input paths.
+Do not derive runtime values from old logs or overwrite an earlier log or result.
+Gralph generates paired `task_N_attempt_M.md` and `task_N_attempt_M_result.json`
+paths in its invocation directory, independently of input paths.
 Gralph reports status to stdout; do not create or update a progress file.
 
 ## Non-Negotiable Rules
@@ -29,7 +31,7 @@ Gralph reports status to stdout; do not create or update a progress file.
 4. Do not combine tasks into one invocation.
 5. Search the repository before editing; do not assume files are missing.
 6. Respect the task's Agent, Files, Steps, Verify, and Done fields.
-7. Keep changes scoped to that task; activity logging is a permitted output.
+7. Keep changes scoped to that task; activity logs and JSON results are permitted outputs.
 8. Verify and clean up before marking the task complete.
 9. Record activity throughout the attempt, including failure; finalize the result
    only after cleanup, required checklist updates, and commit attempts.
@@ -44,9 +46,11 @@ Gralph reports status to stdout; do not create or update a progress file.
 ### Step 1: Initialize the log and identify the task
 
 Validate the supplied runtime inputs. If any are missing or invalid, stop task
-work and report the missing input; do not invent a result identity or log path.
-Create the supplied activity Markdown file using the embedded template below,
-without a terminal marker. If writing fails, stop and report the failure.
+work and report the missing input; do not invent a result identity or artifact paths.
+Gralph reserves an empty activity Markdown file for this attempt. Initialize
+only that supplied reserved file using the embedded template below; never
+replace an earlier attempt's log. Do not create the result file yet, even as an
+empty placeholder. If the log cannot be initialized, stop and report the failure.
 Populate frontmatter, using timezone-bearing timestamps and `ended_at: null`.
 Use None or Not run with a reason for currently empty sections.
 
@@ -73,7 +77,7 @@ If subagents are available, delegate to the named Agent; otherwise perform the
 work directly while honoring that role. A worker must report created resources,
 verification, and failures to this invocation's agent, which owns the single
 activity log and final result. Do not let a worker finalize the checklist or
-terminal marker independently.
+result file independently.
 
 Record actions and concrete resource IDs/paths plus ownership context as they
 are created. Use task/attempt numbers in resource names where practical.
@@ -94,14 +98,14 @@ Infrastructure failures are blocked. Every outcome proceeds to Step 6.
 Attempt cleanup on success and failure. Remove only disposable resources created
 for this attempt whose ownership is reasonably verified. Check their absence
 and record failed removals and leftovers. Preserve source changes, Git state,
-evidence, activity logs, and shared resources. Never broadly prune shared
+evidence, activity logs, result files, and shared resources. Never broadly prune shared
 infrastructure. Retained resources need a reason, recovery owner, and next
 action; retention must not disguise incomplete cleanup. Unresolved cleanup is
 blocked.
 
 Only after verification and cleanup succeed, inspect the task's source and
 supporting changes. If changes need committing, stage them and commit with the
-task number and title. Keep unrelated work, activity logs, and retained evidence
+task number and title. Keep unrelated work, activity logs, result files, and retained evidence
 outside task commits. Do not bypass hooks or required signing. Allow at most one
 scoped repair-and-recommit attempt; rerun affected checks if that repair changes
 code. A remaining or unsafe commit failure is blocked.
@@ -134,10 +138,11 @@ checkbox correction fails.
 
 Record task/checklist/commit/cleanup outcomes and manual recovery needs. Set
 `ended_at` with its timezone and choose the disposition using the output contract.
-Append the fully populated terminal marker as the last nonblank line, then stop.
-If finalizing the log fails, report the write failure and stop; chat cannot
-substitute for the file. Briefly report task outcome, verification, cleanup,
-activity path, and next action. Do not execute another task.
+After the human log is finalized, create the supplied JSON result file exclusively
+and write the complete result. Never overwrite an existing result. If finalizing
+either file fails, report the write failure and stop; chat cannot substitute for
+the files. Briefly report task outcome, verification, cleanup, activity and result
+paths, and next action. Do not execute another task.
 
 ## Failure Modes to Avoid
 
@@ -145,25 +150,30 @@ activity path, and next action. Do not execute another task.
 - Marking failed work complete or forgetting cleanup on failure.
 - Removing source changes or evidence as though they were disposable resources.
 - Committing unrelated work or retrying failed commits without a bound.
-- Emitting a terminal marker while work is still active.
+- Creating a result file or placeholder while work is still active.
 
 ## Output Contract
 
-The activity file is Markdown, including its final result; there is no separate
-JSON result file. Its frontmatter and narrative are for people. Gralph reads
-only the terminal marker after the process exits.
+The activity file is human-readable Markdown with no terminal marker. Gralph
+reads the separate JSON result after the process exits; it does not parse or
+size-check the Markdown log.
 
-Keep the whole file within 1 MiB and the terminal line within 4 KiB. Reference
-larger evidence by path. At finalization remove unused placeholders and template
-guidance; use None or Not run with a reason instead of invented results.
+Reference larger evidence by path. At finalization remove unused placeholders
+and template guidance; use
+None or Not run with a reason instead of invented results.
 
-Append exactly one unfenced line beginning `GRALPH_RESULT` and one ASCII space,
-followed by a single-line JSON object with exactly these keys, no duplicates:
+Create the result only after finalizing the log, cleanup, required checklist
+updates, and commit attempts. Write a standalone UTF-8 JSON object, compact or
+pretty-printed, with these fields using the names shown:
 
-- `version`: integer `1`.
 - `task` and `attempt`: supplied positive integers, matching frontmatter.
 - `disposition`: `continue`, `blocked`, or `finished`.
 - `summary`: nonempty JSON-escaped string.
+
+Do not include a Markdown fence, `GRALPH_RESULT` prefix, extra fields, or trailing
+content other than whitespace. Create the result exclusively; never truncate or
+overwrite an existing result. Missing, partially written, or invalid JSON stops
+the run and requires manual recovery. Preserve logs and results outside commits.
 
 Choose `continue` when safe to advance after success or retry an unchecked
 implementation failure within Gralph's existing finite retry budget. Choose
@@ -178,20 +188,23 @@ valid `continue`; a nonzero exit with a completion claim stops the run. Never
 mark failed work complete. Missing/invalid results and `blocked` authorize no
 continuation or abandonment, including after interruption.
 
-The following is schema guidance, not initialization content. Substitute actual
-runtime values and append only after finalization:
+The following is an illustrative result, not initialization content. Substitute
+actual runtime values and write the JSON file only after finalization:
 
-<!-- markdownlint-disable MD013 -->
-```text
-GRALPH_RESULT {"version":1,"task":TASK_NUMBER,"attempt":ATTEMPT_NUMBER,"disposition":"DISPOSITION","summary":"SUMMARY"}
+```json
+{
+  "task": 1,
+  "attempt": 3,
+  "disposition": "blocked",
+  "summary": "Docker unavailable; task remains incomplete."
+}
 ```
-<!-- markdownlint-enable MD013 -->
 
 ### Initial activity log template
 
 Copy this embedded frontmatter and body into the supplied activity file at
 Step 1. Fill runtime placeholders, retain the actual document paths, and update
-sections throughout the attempt. It contains no terminal marker while active.
+sections throughout the attempt. Do not add a terminal marker.
 
 ```markdown
 ACTIVITY_LOG_TEMPLATE_BODY

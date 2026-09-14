@@ -31,7 +31,7 @@ agent. Gralph supplies the selected task number to each invocation.*
 ## Constraints and Decisions
 
 - [Relevant stack choices, dependencies, and architectural decisions.]
-- Activity logs are permitted runtime outputs outside the listed source files;
+- Activity logs and JSON results are permitted runtime outputs outside listed files;
   preserve them and verification evidence outside task commits.
 
 ## Implementation Plan

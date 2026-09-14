@@ -185,7 +185,7 @@ PY
 @test "converted shared skill instructions are agent-agnostic" {
     # Match the literal Claude argument token.
     # shellcheck disable=SC2016
-    run grep -R -E --include='SKILL.md' --include='*-template.md' -- \
+    run grep -R -E --include='*.md' --include='*.yaml' --include='*.yml' --include='*.json' -- \
         'Claude Code|Main Claude|Task tool|\$ARGUMENTS|skills/claude|\.claude/' \
         "${SHARED_SKILLS_ROOT}/code-review" \
         "${SHARED_SKILLS_ROOT}/rlm" \
