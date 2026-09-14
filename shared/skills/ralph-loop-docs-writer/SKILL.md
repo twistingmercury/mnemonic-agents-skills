@@ -14,7 +14,13 @@ Respect the user's destination, project scope, verification, and commit policies
 ## Target runtime and validation
 
 These templates target Gralph's YAML runtime with Gralph-owned task status,
-agent-owned checkpoints, and `completed`, `retry`, and `blocked` results.
+agent-owned checkpoints, and `completed` or `blocked` results. Each task gets
+exactly one attempt: there is no retry, no attempt budget, and no `--iterations`
+flag. A result carrying the withdrawn `retry` disposition is rejected as an
+invalid result disposition and stops the run, so a generated prompt that still
+names it produces failing runs. Regenerate any prompt written against the
+withdrawn contract from these templates instead of patching it in place.
+
 Validate each generated pair with a compatible binary; older installations may
 lack YAML input or dry-run support. Generation can succeed even when runtime
 validation is unavailable, but that does not establish readiness to run.
@@ -46,17 +52,17 @@ snake_case version with synchronized `Version`, `Date`, and `Notes` metadata.
 Treat committed documents as published when publication is uncertain.
 `LOOP_TASKS.yaml` and `LOOP_PROMPT.md` are canonical living workflow files; update
 them in place when authorized. Historical resources are retained outside the installed package in the source
-repository archive. Generate workflows only from the four v02 resources below.
+repository archive. Generate workflows only from the four v03 resources below.
 
 ## Generate the pair
 
 1. Read repository instructions and relevant design/build documents. Establish
    scope, output destination, actual document paths, and project verification
    and Git policies. Do not add automatic commits where none are required.
-2. Read [the YAML task template](templates/loop_tasks_template_v02.yaml),
-   [the prompt template](templates/loop_prompt_template_v02.md),
-   [the JSON result template](templates/activity_result_template_v02.json), and
-   [the human log template](templates/activity_log_template_v02.md).
+2. Read [the YAML task template](templates/loop_tasks_template_v03.yaml),
+   [the prompt template](templates/loop_prompt_template_v03.md),
+   [the JSON result template](templates/activity_result_template_v03.json), and
+   [the human log template](templates/activity_log_template_v03.md).
 3. Write `LOOP_TASKS.yaml` with a top-level `tasks` sequence. Each task has a
    stable positive integer `id`, nonblank `title`, `status`, optional `agent`,
    string `checkpoint`, and nonblank block-scalar `prompt`. New tasks start
@@ -86,18 +92,27 @@ repository archive. Generate workflows only from the four v02 resources below.
 
 ## Task scope and ownership
 
-One task delivers one independently verifiable capability. Use an exact
-registered specialist name when appropriate; the optional `agent` label conveys
+One task delivers one independently verifiable capability. Scope each task, its
+steps, and its completion criteria to what one attempt can finish and verify;
+nothing is carried forward into a later attempt. Use an exact registered
+specialist name when appropriate; the optional `agent` label conveys
 intent and does not select an executable. Keep task prompts focused and split
 independent goals. Verification commands must fit the target repository; do not
 invent passes or require source tests for documentation-only changes.
 
 Gralph supplies the complete selected prompt, checkpoint, task ID, attempt,
-YAML path, and artifact paths. The agent executes only that task; it does not
-search for the next task or alter status. Gralph persists `in_progress` before
-launch and alone applies terminal status from the accepted result and retry
-policy. The agent atomically updates only the selected checkpoint, preserving
-all other task values. Checkpoints describe verified progress, remaining work,
+YAML path, and artifact paths. The attempt number sequences this invocation's
+artifacts and continues across runs; it never counts tries at the task, so
+`task_7_attempt_3.md` is the third run that reached task 7. The agent executes
+only that task; it does not search for the next task or alter status. Gralph
+persists `in_progress` before launch and alone applies terminal status from the
+accepted result. An accepted `completed` result with a zero process exit is the
+only outcome that advances. A `blocked` result replays the agent's captured
+output; it, and every other outcome, retains `in_progress` and stops the run.
+A whole-run cap allows one attempt for each task present at the first load, so
+an agent that changes a status Gralph owns makes a finished task selectable
+again and trips the cap. The agent atomically updates only the selected
+checkpoint, preserving all other task values. Checkpoints describe verified progress, remaining work,
 and recovery needs; they never authorize completion.
 
 The agent initializes Gralph's reserved empty human log before work, records
@@ -117,6 +132,9 @@ Installing this skill does not migrate existing projects. Migrate only when
 requested. Inventory both old and new inputs before editing: written task IDs,
 sequence, full instructions, policies, states, and checkpoints. Map Markdown
 `[ ]` to `pending`, `[x]`/`[X]` to `completed`, and `[~]` to `abandoned`.
+`abandoned` remains valid input that selection passes over, but Gralph never
+writes it: it is a hand-set convention a person uses to skip a task, so only a
+migration or a human sets it.
 Preserve existing YAML states (including terminal states), IDs, order, prompts,
 and checkpoints; initialize only new checkpoints to the empty string.
 
